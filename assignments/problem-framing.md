@@ -34,6 +34,7 @@
 ## Features
 
 - **Rating System**: Easily rate each song from 1 to 5 and jot down your first impressions or detailed thoughts. Your ratings are saved automatically, so you can revisit and edit them anytime.
+- **Link to Music**: Open songs directly in Spotify (via a link) so you can listen whenever you want.
 - **Social networking**: Check out your friends’ ratings, explore their reviews, and share your thoughts in the comments.
 - **Favorites**: Keep track of your favorite albums, artists, and songs. You can access your friends' lists of favorites on their profile page
 - **Song Recommendation**: Discover new music tailored to your taste, inspired by your past reviews.
