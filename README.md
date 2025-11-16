@@ -8,3 +8,4 @@ Noted is a social app for sharing and discovering music. Rate what you’ve been
 ## Assignments
 
 - [Problem Framing](assignments/problem-framing.md)
+- [Project Pitch](https://drive.google.com/file/d/1KCP_4ZsTT379YIRB6WZqXCcdx9G-9s2r/view?usp=sharing)
