@@ -2,7 +2,7 @@
 
 Click the links below to navigate to the deliverables.
 
-[Updated Problem Framing](problem-framing.md)
+[Updated Problem Framing](../problem-framing/problem-framing.md)
 
 [Concept Design](concept-design.md)
 

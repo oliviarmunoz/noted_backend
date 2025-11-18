@@ -37,7 +37,6 @@
 - **Link to Music**: Open songs directly in Spotify (via a link) so you can listen whenever you want.
 - **Social networking**: Check out your friends’ ratings, explore their reviews, and share your thoughts in the comments.
 - **Favorites**: Keep track of your favorite albums, artists, and songs. You can access your friends' lists of favorites on their profile page
-- **Song Recommendation**: Discover new music tailored to your taste, inspired by your past reviews.
 - **Listen Later**: Add songs to a listen later feature based on friends' reviews and ratings, or just individually. Easy place to also keep track of songs that you have listened to already but may want to hold off on reviewing until later.
 
 ## Ethical Analysis
