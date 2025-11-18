@@ -10,7 +10,9 @@ Click the links below to navigate to the deliverables.
 
 [UI Sketches](ui-sketches.pdf)
 
-[Visual Design Study]
+[Visual Design Study - Colors](visual-design1.png)
+
+[Visual Design Study - Typography](visual-design2.png)
 
 [Design Summary](design-summary.md)
 
