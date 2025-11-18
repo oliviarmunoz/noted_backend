@@ -16,6 +16,7 @@
 | 11/30 | User profile is updated to show dynamic recent activity and public favorites | Olivia |
 | 12/2 | **Checkpoint: Beta** - All features complete; major addition since Alpha is friends & feed | All |
 | 12/4 | Polish and finalize UI formatting across Noted | All |
+| 12/4 | Finalize work on stretch goals if time allows (recommendation system) | All |
 | 12/5 | Complete user testing | All |
 | 12/7 | Implement user testing feedback and complete user demo | All |
 | 12/8 | Final Project Report | All |
