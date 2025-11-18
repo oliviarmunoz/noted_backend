@@ -8,7 +8,7 @@ Click the links below to navigate to the deliverables.
 
 [User Journey](user-journey.md)
 
-[UI Sketches](ui-sketches.pdf)
+[UI Sketches](ui-sketches.md)
 
 [Visual Design Study - Colors](visual-design1.png)
 
