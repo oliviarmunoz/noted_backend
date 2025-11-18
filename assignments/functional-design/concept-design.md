@@ -57,9 +57,9 @@
     - **profile**: Photo
 
 ### Core Actions
-- `addUser(username: String, name: String, bio: String, profile: Photo): User` - Creates a profile.
+- `addUser(user: User, username: String, name: String, bio: String, profile: Photo): UserProfile` - Creates a profile.
     - *Requires*: `username` to be non-empty and unique.
-    - *Effect*: Creates a new user with the given details and generates a unique userId to be used to reference users in the back end.
+    - *Effect*: Creates a new user profile with the given details and links it to the input user
 - `deleteUser(user: User)` - Deletes a profile.
     - *Requires*: A UserProfile exists for the given `user`.
     - *Effect*: Deletes the associated UserProfile.
@@ -139,7 +139,7 @@
     - *Effect*: Returns the reviews that the given `user` has authored for an `item`.
 - `_getItemReviews(item: Item): Review[]` - Gets all reviews for an item.
     - *Effect*: Returns reviews associated with that `item`.
-- `_getUserReviews(user: userId): Review[]` - Gets all reviews by a user.
+- `_getUserReviews(user: User): Review[]` - Gets all reviews by a user.
     - *Effect*: Returns reviews associated with the given `user`.
 
 ### Note:
@@ -158,17 +158,17 @@ Users can comment on reviews (either their own or another users’) .
     - **items**: A set of Items
 
 ### Core Actions
-- `addItem(user: userId, item: musicId, playlist: playlistName)` - Adds an item to a playlist.
-    - *Requires*: `userId` to be in set of users, `musicId` to be a valid song or album, `playlistName` to be in set of playlists associated with a `user`.
+- `addItem(user: User, item: musicId, playlist: playlistName)` - Adds an item to a playlist.
+    - *Requires*: `User` to exist, `musicId` to be a valid song or album, `playlistName` to be in set of playlists associated with a `user`.
     - *Effect*: Adds the `item` to the playlist.
-- `deleteItem(user: userId, item: musicId, playlist: playlistName)` - Removes an item from a playlist.
-    - *Requires*: `userId` to be in set of users, `musicId` to be a valid song or album, `playlistName` to be in set of playlists associated with a `user`.
+- `deleteItem(user: User, item: musicId, playlist: playlistName)` - Removes an item from a playlist.
+    - *Requires*: `User` to exist, `musicId` to be a valid song or album, `playlistName` to be in set of playlists associated with a `user`.
     - *Effect*: Removes the `item` from the playlist.
-- `createPlaylist(user: userId, playlistName: String)` - Creates a new empty playlist.
-    - *Requires*: `userId` to be in set of users, `playlistName` to not already exist in set of playlists associated with the `user`.
+- `createPlaylist(user: User, playlistName: String)` - Creates a new empty playlist.
+    - *Requires*: `User` to exist, `playlistName` to not already exist in set of playlists associated with the `user`.
     - *Effect*: Creates a new playlist object with the given information.
-- `getPlaylistItems(user: userId, playlistName: String): Item[]` - Retrieves items in a playlist.
-    - *Requires*: `userId` to be in set of users, `playlistName` to be in set of playlists associated with a `user`.
+- `getPlaylistItems(user: User, playlistName: String): Item[]` - Retrieves items in a playlist.
+    - *Requires*: `User` to exist, `playlistName` to be in set of playlists associated with a `user`.
     - *Effect*: Returns all items in this playlist.
 
 ### Note:
@@ -180,9 +180,9 @@ This concept will be used to implement the “Listen Later” and “Favorites�
 
 ### when `UserAuthentication.register (username)`
 ### then:
-`UserProfile.addUser (username, name, bio, profile): (userId)` \
-`Playlist.createPlaylist(user: userId, playlistName: “Listen Later”)` \
-`Playlist.createPlaylist(user: userId, playlistName: “Favorites”)`
+`UserProfile.addUser (username, name, bio, profile): (User)` \
+`Playlist.createPlaylist(user: User, playlistName: “Listen Later”)` \
+`Playlist.createPlaylist(user: User, playlistName: “Favorites”)`
 
 ## Sync: login
 
@@ -192,13 +192,13 @@ This concept will be used to implement the “Listen Later” and “Favorites�
 
 ## Sync: userDeletion
 
-### when `UserProfile.deleteUser (userId)`
+### when `UserProfile.deleteUser (User)`
 ### then:
-`UserAuthentication.deleteCredentials (userId)` \
-**For all users:** `Friending.removeFriend(userId)`
+`UserAuthentication.deleteCredentials (User)` \
+**For all users:** `Friending.removeFriend(User)`
 
 ## Sync: reviewPost
 
-### when `Review.postReview (userId, item)`
+### when `Review.postReview (User, item)`
 ### then:
-`Playlist.deleteItem(userId, item, “Listen Later”)`
+`Playlist.deleteItem(User, item, “Listen Later”)`
