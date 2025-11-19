@@ -3,7 +3,7 @@
 ## Concept: UserAuthentication [User]
 
 **Purpose**: Limit access to known users. \
-**Principle**: If a user registers with a unique username and password, they can later log in using those same credentials to prove their identity and gain access.
+**Principle**: If a user registers with a unique username and password, they can later log in using those same credentials to prove their identity and gain access. If desired, a user can delete their credentials, thus making them invalid for authentication.
 
 **State**
 
@@ -21,7 +21,7 @@
   - _Effects_: Returns the User associated with the credentials.
 - `deleteCredentials(user: User)`
   - _Requires_: `user` exists.
-  - _Effects_: Deletes the `User`.
+  - _Effects_: Removes user from the set of all Users.
 - `_getUsername(user: User): String`
   - _Requires_: `user` exists.
   - _Effects_: Returns the username of the user.
@@ -38,16 +38,17 @@
 
 **Actions**
 
-- `create(user: User): Session`
+- `create(user: User): (session: Session)`
+  - _Requires_: There is no preexisting session for the user.
   - _Effects_: A new session is created and associated with the given `user`; returns the session created.
-- `delete(session: Session)`
+- `delete(session: Session): ()`
   - _Requires_: The given `session` exists.
   - _Effects_: The `session` is removed.
-- `_getUser(session: Session): User`
+- `_getUser(session: Session): (user: User)`
   - _Requires_: The given `session` exists.
   - _Effects_: Returns the `user` associated with the session.
 
-## Concept: UserProfile
+## Concept: UserProfile [User]
 
 **Purpose**: Allows profile personalization to display to other users to enable social interaction. \
 **Principle**: A user will be prompted to create and personalize their profile upon user registration, they are then free to update their profile at any time.
@@ -56,36 +57,27 @@
 
 - A set of **UserProfiles** with
   - a **user** User
-  - a **username** String
   - a **name** String
   - a **bio** String
-  - a **profile** Photo
 
 **Actions**
 
-- `addUser(user: User, username: String, name: String, bio: String, profile: Photo): UserProfile`
-  - _Requires_: `username` is non-empty and unique.
+- `addUser(user: User, name: String, bio: String): (userProfile: UserProfile)`
   - _Effects_: Creates a new user profile with the given details and links it to the input user
 - `deleteUser(user: User)`
   - _Requires_: A UserProfile exists for the given `user`.
   - _Effects_: Deletes the associated UserProfile.
-- `updateUsername(user: User, newUsername: String)`
-  - _Requires_: A UserProfile exists for the given `user`, `newUsername` is not already in use.
-  - _Effects_: Updates the username of the associated `user`.
 - `updateName(user: User, newName: String)`
   - _Requires_: A UserProfile exists for the given `user`.
   - _Effects_: Changes the name of the associated `user`.
 - `updateBio(user: User, newBio: String)`
   - _Requires_: A UserProfile exists for the given `user`.
   - _Effects_: Changes the bio of the associated `user`.
-- `updatePicture(user: User, newPicture: Photo)`
-  - _Requires_: A UserProfile exists for the given `user`.
-  - _Effects_: Changes the picture of the associated `user`.
 
-## Concept: Friending
+## Concept: Friending [User]
 
 **Purpose**: Enable users to establish and manage mutual social connections. \
-**Principle**: A user can send a friend request to another user; they may choose to remove this request before the target user takes action; the recipient of a friend request can choose to accept or remove it; once a request is accepted, two users become friends; friendship may be revoked.
+**Principle**: A user can send a friend request to another user; request can be revoked by the sender before the target user takes action; the recipient of a friend request can choose to accept or remove it; once a request is accepted, two users become friends; friendship may be revoked.
 
 **State**
 
@@ -96,16 +88,16 @@
 
 **Actions**
 
-- `sendFriendRequest(user: User, target: User)`:
-  - _Requires_: `user` and `target` are not existing friends, `user` has not already sent a request to `target`, `user` and `target` are not the same.
+- `sendFriendRequest(user: User, target: User): ()`
+  - _Requires_: `user` and `target` are not existing friends, `user` has not already sent a request to `target`,`target` has not already sent a request to `user`, `user` and `target` are not the same.
   - _Effects_: `target` is added to the set of the `user`'s outgoing requests; `user` is added to the set of `target`'s incoming requests.
-- `acceptFriendRequest(requester: User, target: User)`
+- `acceptFriendRequest(requester: User, target: User): ()`
   - _Requires_: `requester` has sent a friend request to `target`, `requester` and `target` are not friends, `requester` and `target` are not the same.
   - _Effects_: `requester` and `target` are added to each other's set of friends, they are both removed from the other's set of incoming/outgoingRequests.
-- `removeFriendRequest(requester: User, target: User)`
+- `removeFriendRequest(requester: User, target: User): ()`
   - _Requires_: `requester` has sent a friend request to `target`, `requester` and `target` are not friends, `requester` and `target` are not the same.
   - _Effects_: `requester` is removed from the `target`'s set of incomingRequests, `target` is removed from the `requester`'s set of outgoingRequests.
-- `removeFriend(user: User, friend: User)`
+- `removeFriend(user: User, friend: User): ()`
   - _Requires_: `user` and `friend` are friends with each other, `user` and `friend` are not the same.
   - _Effects_: `user` and `friend` are both removed from each other's set of friends.
 
@@ -130,19 +122,19 @@
 **Actions**
 
 - `postReview(item: Item, user: User, ratingNumber: Number, notes: String): (review: Review)`
-  - _Requires_: `ratingNumber` to be an integer in the range [1,5].
+  - _Requires_: `ratingNumber` is an integer in the range [0,5].
   - _Effects_: Creates and returns a review with the given information.
 - `updateReview(review: Review, ratingNumber: Number, notes: String)`
-  - _Requires_: `review` exists, `ratingNumber` is between 1 and 5.
-  - _Effects_: Updates the `ratingNumber` or `notes` of the associated `review`.
+  - _Requires_: `review` exists, `ratingNumber` is an integer in the range [0,5].
+  - _Effects_: Updates the `ratingNumber` and `notes` of the associated `review`.
 - `deleteReview(review: Review)`
   - _Requires_: `review` exists.
-  - _Effects_: Removes the associated `review`.
-- `addComment(review: reviewId, commenter: User, comment: String): commentId`
+  - _Effects_: Removes the associated `review` from the set of all reviews.
+- `addComment(review: Review, commenter: User, comment: String): (commentId: Id)`
   - _Requires_: `review` exists.
   - _Effects_: Adds a comment by the input user to the list of comments of the associated `review`.
 - `deleteComment(review: Review, comment: commentId)`
-  - _Requires_: `reviewId` to be in the set of reviews, `commentId` to be in list of comments of the associated review.
+  - _Requires_: `review` to be in the set of reviews, `commentId` to be in list of comments of the associated review.
   - _Effects_: Deletes the comment from the list.
 - `_getReviewByItemAndUser(item: Item, user: User): Review`
   - _Requires_: `review` exists.
@@ -151,8 +143,8 @@
   - _Effects_: Returns reviews associated with that `item`.
 - `_getUserReviews(user: User): Review[]`
   - _Effects_: Returns reviews associated with the given `user`.
-
-_Note_: Users can comment on reviews (either their own or another users’) .
+- `_getReviewComments(review: Review): Id[]`
+  - _Effects_: Returns all comments associated with the given `review`.
 
 ## Concept: Playlist [User, Item]
 
@@ -169,17 +161,17 @@ _Note_: Users can comment on reviews (either their own or another users’) .
 
 **Actions**
 
-- `addItem(user: User, item: musicId, playlist: playlistName)`
-  - _Requires_: `User` to exist, `musicId` to be a valid song or album, `playlistName` to be in set of playlists associated with a `user`.
+- `addItem(user: User, item: Item, playlist: playlistName)`
+  - _Requires_: `playlistName` to be in set of playlists associated with the `user`.
   - _Effects_: Adds the `item` to the playlist.
-- `deleteItem(user: User, item: musicId, playlist: playlistName)`
-  - _Requires_: `User` to exist, `musicId` to be a valid song or album, `playlistName` to be in set of playlists associated with a `user`.
+- `deleteItem(user: User, item: Item, playlist: playlistName)`
+  - _Requires_: `playlistName` is in set of playlists associated with the `user`.
   - _Effects_: Removes the `item` from the playlist.
 - `createPlaylist(user: User, playlistName: String)`
-  - _Requires_: `User` to exist, `playlistName` to not already exist in set of playlists associated with the `user`.
-  - _Effects_: Creates a new playlist object with the given information.
-- `getPlaylistItems(user: User, playlistName: String): Item[]`
-  - _Requires_: `User` to exist, `playlistName` to be in set of playlists associated with a `user`.
+  - _Requires_: `playlistName` to not already exist in set of playlists associated with the `user`.
+  - _Effects_: Creates a new Playlist with the given information.
+- `_getPlaylistItems(user: User, playlistName: String): Item[]`
+  - _Requires_: `playlistName` is in set of playlists associated with the `user`.
   - _Effects_: Returns all items in this playlist.
 
 _Note_: This concept will be used to implement the “Listen Later” and “Favorites” playlist. The user should only be able to add and remove items, while the backend will create those playlists upon user creation.
