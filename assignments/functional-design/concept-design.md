@@ -97,7 +97,7 @@
 **Actions**
 
 - `sendFriendRequest(user: User, target: User)`:
-  - _Requires_: `user` and `target` are not existing friends, `user` has not already sent a request to `target`, `user` and `target` are not the same.
+  - _Requires_: `user` and `target` are not existing friends, `user` has not already sent a request to `target`, `user` has not already received a request from `target`, `user` and `target` are not the same.
   - _Effects_: `target` is added to the set of the `user`'s outgoing requests; `user` is added to the set of `target`'s incoming requests.
 - `acceptFriendRequest(requester: User, target: User)`
   - _Requires_: `requester` has sent a friend request to `target`, `requester` and `target` are not friends, `requester` and `target` are not the same.
