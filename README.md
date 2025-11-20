@@ -5,6 +5,10 @@ Noted is a social app for sharing and discovering music. Rate what you’ve been
 - Team Name: OVAL
 - Team Members: munoz03, vrosales, angelajc, larag846
 
+## Project Updates
+
+- [Week 2](/project-updates/week2.md)
+
 ## Assignments
 
 - [Problem Framing](assignments/problem-framing/problem-framing.md)

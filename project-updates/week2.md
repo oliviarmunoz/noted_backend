@@ -6,7 +6,9 @@
 
 ## Progress Report
 - Proof of concept with Spotify API; able to grab song information with corresponding spotify url and use search feature
+- Settled on UI sketches and overall design look + feel
 - Designed concepts/syncs, currently working on implementation
+- Working on peer critiques
 
 ## Design Changes
 - Addition of playlist concept for Listen Later and Favorites Feature (debated whether users should be allowed to make custom playlists as well)
