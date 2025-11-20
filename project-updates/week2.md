@@ -1,7 +1,7 @@
 # Week 2 Project Updates
 
 ## Agenda
-- Review development plan from problem framing assignment last week
+- Review development plan from functional design assignment last week
 - Evaluation of concepts
 
 ## Progress Report
