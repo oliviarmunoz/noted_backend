@@ -1,3 +1,5 @@
+import "jsr:@std/dotenv/load";
+
 const client_id = Deno.env.get("CLIENT_ID"); 
 const client_secret = Deno.env.get("CLIENT_SECRET");
 
