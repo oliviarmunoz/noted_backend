@@ -20,5 +20,6 @@
                 "no-unversioned-import"
             ]
         }
-    }
+    },
+    "nodeModulesDir": "auto"
 }
