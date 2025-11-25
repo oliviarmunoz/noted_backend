@@ -8,7 +8,7 @@ export const Engine = new SyncConcept();
 import { getDb } from "@utils/database.ts";
 
 import PlaylistConcept from "./Playlist/PlaylistConcept.ts";
-import LikertSurveyConcept from "./LikertSurvey/LikertSurveyConcept.ts";
+import MusicDiscoveryConcept from "./MusicDiscovery/MusicDiscoveryConcept.ts";
 import FriendingConcept from "./Friending/FriendingConcept.ts";
 import RequestingConcept from "./Requesting/RequestingConcept.ts";
 import ReviewConcept from "./Review/ReviewConcept.ts";
@@ -16,7 +16,7 @@ import UserAuthenticationConcept from "./UserAuthentication/UserAuthenticationCo
 import SessionConcept from "./Session/SessionConcept.ts";
 
 export type { default as PlaylistConcept } from "./Playlist/PlaylistConcept.ts";
-export type { default as LikertSurveyConcept } from "./LikertSurvey/LikertSurveyConcept.ts";
+export type { default as MusicDiscoveryConcept } from "./MusicDiscovery/MusicDiscoveryConcept.ts";
 export type { default as FriendingConcept } from "./Friending/FriendingConcept.ts";
 export type { default as RequestingConcept } from "./Requesting/RequestingConcept.ts";
 export type { default as ReviewConcept } from "./Review/ReviewConcept.ts";
@@ -27,7 +27,7 @@ export type { default as SessionConcept } from "./Session/SessionConcept.ts";
 export const [db, client] = await getDb();
 
 export const Playlist = Engine.instrumentConcept(new PlaylistConcept(db));
-export const LikertSurvey = Engine.instrumentConcept(new LikertSurveyConcept(db));
+export const MusicDiscovery = Engine.instrumentConcept(new MusicDiscoveryConcept(db));
 export const Friending = Engine.instrumentConcept(new FriendingConcept(db));
 export const Requesting = Engine.instrumentConcept(new RequestingConcept(db));
 export const Review = Engine.instrumentConcept(new ReviewConcept(db));
