@@ -9,7 +9,7 @@
 # prompt: generate the API documentation for the Session concept, use the implementation reference
 # response:
 
-# API Specification: Sessioning Concept
+# API Specification: Session Concept
 
 **Purpose:** maintain a user's logged-in state across multiple requests without re-sending credentials.
 
@@ -17,7 +17,7 @@
 
 ## API Endpoints
 
-### POST /api/Sessioning/create
+### POST /api/Session/create
 
 **Description:** Creates a new session and associates it with a given user.
 
@@ -49,7 +49,7 @@
 ```
 ---
 
-### POST /api/Sessioning/delete
+### POST /api/Session/delete
 
 **Description:** Deletes an existing session.
 
@@ -79,7 +79,7 @@
 ```
 ---
 
-### POST /api/Sessioning/_getUser
+### POST /api/Session/_getUser
 
 **Description:** Retrieves the user associated with a given session.
 

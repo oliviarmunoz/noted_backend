@@ -15,27 +15,31 @@ Now, analyze the following Concept Implementation and generate the API documenta
 [review-concept-impl](../../src/concepts/Review/ReviewConcept.ts)
 [session-concept-impl](../../src/concepts/Session/SessionConcept.ts)
 [user-auth-concept-impl](../../src/concepts/UserAuthentication/UserAuthenticationConcept.ts)
+
+Verify that every endpoint is in the code. Do not make up any endpoints or leave out any endpoints.
 # response:
 
 # API Specification: Friending Concept
 
-**Purpose:** allow users to establish one-way or two-way "friend" relationships with other users
+**Purpose:** support the creation of friendships between users
 
 ---
 
 ## API Endpoints
 
-### POST /api/Friending/sendFriendRequest
+### POST /api/Friending/createFriendship
 
-**Description:** Creates a new friend request from one user to another.
+**Description:** Creates a new friendship between two users.
 
 **Requirements:**
-- `sender` and `receiver` exist; `sender` is not `receiver`; `sender` and `receiver` are not already friends;
-- no pending `FriendRequest` from `sender` to `receiver` or `receiver` to `sender`
+- no Friendship already exists between `sender` and `receiver` (either direction)
+- `sender` and `receiver` are not the same user
 
 **Effects:**
-- creates a new `FriendRequest` `r`; sets `sender` of `r` to `sender`; sets `receiver` of `r` to `receiver`;
-- returns `r` as `request`
+- creates a new Friendship `f`
+- sets `f.sender` to `sender` and `f.receiver` to `receiver`
+- sets `f.createdAt` to the current time
+- returns `f` as `friendship`
 
 **Request Body:**
 ```json
@@ -48,7 +52,7 @@ Now, analyze the following Concept Implementation and generate the API documenta
 **Success Response Body (Action):**
 ```json
 {
-  "request": "string"
+  "friendship": "string"
 }
 ```
 
@@ -58,24 +62,23 @@ Now, analyze the following Concept Implementation and generate the API documenta
   "error": "string"
 }
 ```
+
 ---
 
-### POST /api/Friending/acceptFriendRequest
+### POST /api/Friending/deleteFriendship
 
-**Description:** Accepts a pending friend request, making the users friends.
+**Description:** Deletes an existing friendship.
 
 **Requirements:**
-- `request` exists and is pending
+- the `friendship` exists
 
 **Effects:**
-- adds `sender` of `request` to `friends` of `receiver` of `request`;
-- adds `receiver` of `request` to `friends` of `sender` of `request`;
-- deletes `request`
+- deletes the `friendship`
 
 **Request Body:**
 ```json
 {
-  "request": "string"
+  "friendship": "string"
 }
 ```
 
@@ -90,79 +93,18 @@ Now, analyze the following Concept Implementation and generate the API documenta
   "error": "string"
 }
 ```
----
 
-### POST /api/Friending/rejectFriendRequest
-
-**Description:** Rejects a pending friend request, deleting it.
-
-**Requirements:**
-- `request` exists and is pending
-
-**Effects:**
-- deletes `request`
-
-**Request Body:**
-```json
-{
-  "request": "string"
-}
-```
-
-**Success Response Body (Action):**
-```json
-{}
-```
-
-**Error Response Body:**
-```json
-{
-  "error": "string"
-}
-```
----
-
-### POST /api/Friending/unfriend
-
-**Description:** Removes the friendship between two users.
-
-**Requirements:**
-- `userA` and `userB` exist and are friends
-
-**Effects:**
-- removes `userB` from `friends` of `userA`;
-- removes `userA` from `friends` of `userB`
-
-**Request Body:**
-```json
-{
-  "userA": "string",
-  "userB": "string"
-}
-```
-
-**Success Response Body (Action):**
-```json
-{}
-```
-
-**Error Response Body:**
-```json
-{
-  "error": "string"
-}
-```
 ---
 
 ### POST /api/Friending/_getFriends
 
-**Description:** Returns a list of users who are friends with the specified user.
+**Description:** Returns a set of all Users who are friends with the specified user.
 
 **Requirements:**
-- `user` exists
+- true
 
 **Effects:**
-- returns set of all `User`s that are friends with `user`
+- returns a set of all Users who are friends with `user`
 
 **Request Body:**
 ```json
@@ -186,22 +128,24 @@ Now, analyze the following Concept Implementation and generate the API documenta
   "error": "string"
 }
 ```
+
 ---
 
-### POST /api/Friending/_getPendingSentFriendRequests
+### POST /api/Friending/_getFriendship
 
-**Description:** Returns a list of pending friend requests sent by the specified user.
+**Description:** Returns the Friendship ID if a friendship exists between two users.
 
 **Requirements:**
-- `sender` exists
+- true
 
 **Effects:**
-- returns set of all `FriendRequest`s sent by `sender` that are pending, along with their `receiver`
+- returns the Friendship ID if a friendship exists between `userA` and `userB`, or an empty array if not
 
 **Request Body:**
 ```json
 {
-  "sender": "string"
+  "userA": "string",
+  "userB": "string"
 }
 ```
 
@@ -209,8 +153,7 @@ Now, analyze the following Concept Implementation and generate the API documenta
 ```json
 [
   {
-    "request": "string",
-    "receiver": "string"
+    "friendship": "string"
   }
 ]
 ```
@@ -221,22 +164,23 @@ Now, analyze the following Concept Implementation and generate the API documenta
   "error": "string"
 }
 ```
+
 ---
 
-### POST /api/Friending/_getPendingReceivedFriendRequests
+### POST /api/Friending/_getFriendshipsOfUser
 
-**Description:** Returns a list of pending friend requests received by the specified user.
+**Description:** Returns all Friendship IDs associated with the given user.
 
 **Requirements:**
-- `receiver` exists
+- true
 
 **Effects:**
-- returns set of all `FriendRequest`s received by `receiver` that are pending, along with their `sender`
+- returns all Friendship IDs associated with the given `user`
 
 **Request Body:**
 ```json
 {
-  "receiver": "string"
+  "user": "string"
 }
 ```
 
@@ -244,8 +188,7 @@ Now, analyze the following Concept Implementation and generate the API documenta
 ```json
 [
   {
-    "request": "string",
-    "sender": "string"
+    "friendship": "string"
   }
 ]
 ```
@@ -256,11 +199,11 @@ Now, analyze the following Concept Implementation and generate the API documenta
   "error": "string"
 }
 ```
----
 
+---
 # API Specification: Playlist Concept
 
-**Purpose:** allow users to create and manage ordered lists of generic items
+**Purpose:** support users in creating, managing, and sharing ordered collections of items
 
 ---
 
@@ -268,14 +211,17 @@ Now, analyze the following Concept Implementation and generate the API documenta
 
 ### POST /api/Playlist/createPlaylist
 
-**Description:** Creates a new playlist for a given owner with a specified name.
+**Description:** Creates a new playlist for an owner with a specified name.
 
 **Requirements:**
-- `owner` exists; no `Playlist` with `name` exists for `owner`
+- `name` is not empty
 
 **Effects:**
-- creates a new `Playlist` `p`; sets `owner` of `p` to `owner`; sets `name` of `p` to `name`;
-- sets `items` of `p` to empty list; returns `p` as `playlist`
+- creates a new Playlist `p`
+- sets `p.owner` to `owner`
+- sets `p.name` to `name`
+- sets `p.createdAt` and `p.lastModified` to the current time
+- returns `p` as `playlist`
 
 **Request Body:**
 ```json
@@ -298,54 +244,25 @@ Now, analyze the following Concept Implementation and generate the API documenta
   "error": "string"
 }
 ```
----
 
-### POST /api/Playlist/deletePlaylist
-
-**Description:** Deletes a playlist, provided the correct owner is specified.
-
-**Requirements:**
-- `playlist` exists and `owner` is its owner
-
-**Effects:**
-- deletes `playlist`
-
-**Request Body:**
-```json
-{
-  "playlist": "string",
-  "owner": "string"
-}
-```
-
-**Success Response Body (Action):**
-```json
-{}
-```
-
-**Error Response Body:**
-```json
-{
-  "error": "string"
-}
-```
 ---
 
 ### POST /api/Playlist/renamePlaylist
 
-**Description:** Renames an existing playlist, provided the correct owner is specified and the new name is not already in use by another playlist of the same owner.
+**Description:** Renames an existing playlist.
 
 **Requirements:**
-- `playlist` exists and `owner` is its owner; no other `Playlist` with `newName` exists for `owner`
+- the `playlist` exists
+- `newName` is not empty
 
 **Effects:**
-- sets `name` of `playlist` to `newName`
+- updates the `name` of the `playlist` to `newName`
+- updates `lastModified` to the current time
 
 **Request Body:**
 ```json
 {
   "playlist": "string",
-  "owner": "string",
   "newName": "string"
 }
 ```
@@ -361,23 +278,96 @@ Now, analyze the following Concept Implementation and generate the API documenta
   "error": "string"
 }
 ```
+
 ---
 
-### POST /api/Playlist/addPlaylistItem
+### POST /api/Playlist/deletePlaylist
 
-**Description:** Adds a generic item to the end of a playlist.
+**Description:** Deletes a playlist and all its associated items.
 
 **Requirements:**
-- `playlist` exists and `owner` is its owner; `item` exists (externally defined)
+- the `playlist` exists
 
 **Effects:**
-- adds `item` to the end of `items` of `playlist`
+- deletes the `playlist` and all its associated `playlistItems`
+
+**Request Body:**
+```json
+{
+  "playlist": "string"
+}
+```
+
+**Success Response Body (Action):**
+```json
+{}
+```
+
+**Error Response Body:**
+```json
+{
+  "error": "string"
+}
+```
+
+---
+
+### POST /api/Playlist/addItemToPlaylist
+
+**Description:** Adds an item to a playlist at the end.
+
+**Requirements:**
+- the `playlist` exists
+- the `item` is not already in the `playlist`
+
+**Effects:**
+- adds the `item` to the `playlist` at the end
+- sets its `order` to be the next available integer
+- sets `createdAt` to the current time
+- updates `playlist.lastModified`
+- returns the ID of the new playlist item as `playlistItem`
 
 **Request Body:**
 ```json
 {
   "playlist": "string",
-  "owner": "string",
+  "item": "string"
+}
+```
+
+**Success Response Body (Action):**
+```json
+{
+  "playlistItem": "string"
+}
+```
+
+**Error Response Body:**
+```json
+{
+  "error": "string"
+}
+```
+
+---
+
+### POST /api/Playlist/removeItemFromPlaylist
+
+**Description:** Removes an item from a playlist and reorders subsequent items.
+
+**Requirements:**
+- the `playlist` exists
+- the `item` is in the `playlist`
+
+**Effects:**
+- removes the `item` from the `playlist`
+- updates the `order` of subsequent items
+- updates `playlist.lastModified`
+
+**Request Body:**
+```json
+{
+  "playlist": "string",
   "item": "string"
 }
 ```
@@ -393,59 +383,28 @@ Now, analyze the following Concept Implementation and generate the API documenta
   "error": "string"
 }
 ```
+
 ---
 
-### POST /api/Playlist/removePlaylistItem
+### POST /api/Playlist/reorderPlaylistItem
 
-**Description:** Removes the first occurrence of a specified item from a playlist.
+**Description:** Reorders an item within a playlist to a new position.
 
 **Requirements:**
-- `playlist` exists and `owner` is its owner; `item` is in `items` of `playlist`
+- the `playlist` exists
+- the `item` is in the `playlist`
+- `newOrder` is a non-negative integer and within the bounds of the playlist size
 
 **Effects:**
-- removes first occurrence of `item` from `items` of `playlist`
+- updates the `order` of the `item` to `newOrder`, shifting other items as necessary
+- updates `playlist.lastModified`
 
 **Request Body:**
 ```json
 {
   "playlist": "string",
-  "owner": "string",
-  "item": "string"
-}
-```
-
-**Success Response Body (Action):**
-```json
-{}
-```
-
-**Error Response Body:**
-```json
-{
-  "error": "string"
-}
-```
----
-
-### POST /api/Playlist/movePlaylistItem
-
-**Description:** Moves an item within a playlist from one index to another.
-
-**Requirements:**
-- `playlist` exists and `owner` is its owner; `item` is at `fromIndex` in `items` of `playlist`;
-- `fromIndex` and `toIndex` are valid indices within the `items` list
-
-**Effects:**
-- moves `item` from `fromIndex` to `toIndex` in `items` of `playlist`
-
-**Request Body:**
-```json
-{
-  "playlist": "string",
-  "owner": "string",
   "item": "string",
-  "fromIndex": "number",
-  "toIndex": "number"
+  "newOrder": "number"
 }
 ```
 
@@ -460,17 +419,56 @@ Now, analyze the following Concept Implementation and generate the API documenta
   "error": "string"
 }
 ```
+
 ---
 
-### POST /api/Playlist/_getPlaylists
+### POST /api/Playlist/_getPlaylistById
 
-**Description:** Returns a list of playlists owned by a specified user, along with their names.
+**Description:** Returns the details of a specific playlist by its ID.
 
 **Requirements:**
-- `owner` exists
+- the `playlist` exists
 
 **Effects:**
-- returns set of all `Playlist`s owned by `owner`, with their `name`
+- returns the details of the playlist: its owner, name, creation date, and last modified date
+
+**Request Body:**
+```json
+{
+  "playlist": "string"
+}
+```
+
+**Success Response Body (Query):**
+```json
+[
+  {
+    "owner": "string",
+    "name": "string",
+    "createdAt": "string",
+    "lastModified": "string"
+  }
+]
+```
+
+**Error Response Body:**
+```json
+{
+  "error": "string"
+}
+```
+
+---
+
+### POST /api/Playlist/_getPlaylistsByOwner
+
+**Description:** Returns a list of playlists owned by a specific user.
+
+**Requirements:**
+- true
+
+**Effects:**
+- returns a list of playlists owned by the `owner`, including their IDs, names, creation dates, and last modified dates
 
 **Request Body:**
 ```json
@@ -484,43 +482,9 @@ Now, analyze the following Concept Implementation and generate the API documenta
 [
   {
     "playlist": "string",
-    "name": "string"
-  }
-]
-```
-
-**Error Response Body:**
-```json
-{
-  "error": "string"
-}
-```
----
-
-### POST /api/Playlist/_getPlaylistDetails
-
-**Description:** Returns the full details (name, owner, and items) of a specific playlist.
-
-**Requirements:**
-- `playlist` exists
-
-**Effects:**
-- returns `name`, `owner`, and `items` of `playlist`
-
-**Request Body:**
-```json
-{
-  "playlist": "string"
-}
-```
-
-**Success Response Body (Query):**
-```json
-[
-  {
     "name": "string",
-    "owner": "string",
-    "items": "string[]"
+    "createdAt": "string",
+    "lastModified": "string"
   }
 ]
 ```
@@ -531,17 +495,18 @@ Now, analyze the following Concept Implementation and generate the API documenta
   "error": "string"
 }
 ```
+
 ---
 
 ### POST /api/Playlist/_getPlaylistItems
 
-**Description:** Returns an ordered list of items contained within a specified playlist.
+**Description:** Returns all items in a playlist, ordered by their `order` property.
 
 **Requirements:**
-- `playlist` exists
+- the `playlist` exists
 
 **Effects:**
-- returns ordered list of `item`s in `playlist`
+- returns all items in the `playlist`, ordered by their `order` property, including their ID, order, and creation date
 
 **Request Body:**
 ```json
@@ -554,7 +519,9 @@ Now, analyze the following Concept Implementation and generate the API documenta
 ```json
 [
   {
-    "item": "string"
+    "item": "string",
+    "order": "number",
+    "createdAt": "string"
   }
 ]
 ```
@@ -565,27 +532,29 @@ Now, analyze the following Concept Implementation and generate the API documenta
   "error": "string"
 }
 ```
----
 
+---
 # API Specification: Review Concept
 
-**Purpose:** allow users to rate and provide textual feedback on generic targets
+**Purpose:** support users in providing feedback and ratings on specific targets
 
 ---
 
 ## API Endpoints
 
-### POST /api/Review/postReview
+### POST /api/Review/createReview
 
-**Description:** Allows an author to post a new review for a target with a rating and text.
+**Description:** Creates a new review for a target with a rating and optional text.
 
 **Requirements:**
-- `author` exists; `target` exists; `rating` is between 1 and 5 inclusive;
-- `author` has not previously reviewed `target`
+- `rating` is between 1 and 5 (inclusive)
+- a `User` can only create one `Review` for a given `Target`
 
 **Effects:**
-- creates a new `Review` `r`; sets `author` of `r` to `author`; sets `target` of `r` to `target`;
-- sets `rating` of `r` to `rating`; sets `text` of `r` to `text`; returns `r` as `review`
+- creates a new Review `r`
+- sets `r.author` to `author`, `r.target` to `target`, `r.rating` to `rating`, and `r.text` if provided
+- sets `r.createdAt` and `r.lastModified` to the current time
+- returns `r` as `review`
 
 **Request Body:**
 ```json
@@ -593,7 +562,7 @@ Now, analyze the following Concept Implementation and generate the API documenta
   "author": "string",
   "target": "string",
   "rating": "number",
-  "text": "string"
+  "text": "string" (optional)
 }
 ```
 
@@ -610,25 +579,28 @@ Now, analyze the following Concept Implementation and generate the API documenta
   "error": "string"
 }
 ```
+
 ---
 
 ### POST /api/Review/updateReview
 
-**Description:** Updates the rating and text of an existing review, provided the correct author is specified.
+**Description:** Updates the rating and/or text of an existing review.
 
 **Requirements:**
-- `review` exists and `author` is its author; `rating` is between 1 and 5 inclusive
+- the `review` exists
+- if `rating` is provided, it must be between 1 and 5 (inclusive)
+- at least one of `rating` or `text` must be provided
 
 **Effects:**
-- sets `rating` of `review` to `rating`; sets `text` of `review` to `text`
+- updates the `rating` and/or `text` of the `review` if provided
+- updates `lastModified` to the current time
 
 **Request Body:**
 ```json
 {
   "review": "string",
-  "author": "string",
-  "rating": "number",
-  "text": "string"
+  "rating": "number" (optional),
+  "text": "string" (optional)
 }
 ```
 
@@ -643,23 +615,23 @@ Now, analyze the following Concept Implementation and generate the API documenta
   "error": "string"
 }
 ```
+
 ---
 
 ### POST /api/Review/deleteReview
 
-**Description:** Deletes an existing review, provided the correct author is specified.
+**Description:** Deletes an existing review.
 
 **Requirements:**
-- `review` exists and `author` is its author
+- the `review` exists
 
 **Effects:**
-- deletes `review`
+- deletes the `review`
 
 **Request Body:**
 ```json
 {
-  "review": "string",
-  "author": "string"
+  "review": "string"
 }
 ```
 
@@ -674,17 +646,58 @@ Now, analyze the following Concept Implementation and generate the API documenta
   "error": "string"
 }
 ```
+
+---
+
+### POST /api/Review/_getReviewById
+
+**Description:** Returns the details of a specific review by its ID.
+
+**Requirements:**
+- the `review` exists
+
+**Effects:**
+- returns the details of the review: author, target, rating, text, creation date, and last modified date
+
+**Request Body:**
+```json
+{
+  "review": "string"
+}
+```
+
+**Success Response Body (Query):**
+```json
+[
+  {
+    "author": "string",
+    "target": "string",
+    "rating": "number",
+    "text": "string" (optional),
+    "createdAt": "string",
+    "lastModified": "string"
+  }
+]
+```
+
+**Error Response Body:**
+```json
+{
+  "error": "string"
+}
+```
+
 ---
 
 ### POST /api/Review/_getReviewsByTarget
 
-**Description:** Returns a list of all reviews for a specific target, including author, rating, and text.
+**Description:** Returns a list of all reviews for a given target.
 
 **Requirements:**
-- `target` exists
+- true
 
 **Effects:**
-- returns set of all `Review`s for `target`, with their `author`, `rating`, and `text`
+- returns a list of all reviews for a given `target`, including their ID, author, rating, text, creation date, and last modified date
 
 **Request Body:**
 ```json
@@ -700,7 +713,9 @@ Now, analyze the following Concept Implementation and generate the API documenta
     "review": "string",
     "author": "string",
     "rating": "number",
-    "text": "string"
+    "text": "string" (optional),
+    "createdAt": "string",
+    "lastModified": "string"
   }
 ]
 ```
@@ -711,17 +726,18 @@ Now, analyze the following Concept Implementation and generate the API documenta
   "error": "string"
 }
 ```
+
 ---
 
 ### POST /api/Review/_getReviewsByAuthor
 
-**Description:** Returns a list of all reviews posted by a specific author, including target, rating, and text.
+**Description:** Returns a list of all reviews created by a given author.
 
 **Requirements:**
-- `author` exists
+- true
 
 **Effects:**
-- returns set of all `Review`s by `author`, with their `target`, `rating`, and `text`
+- returns a list of all reviews created by a given `author`, including their ID, target, rating, text, creation date, and last modified date
 
 **Request Body:**
 ```json
@@ -737,7 +753,9 @@ Now, analyze the following Concept Implementation and generate the API documenta
     "review": "string",
     "target": "string",
     "rating": "number",
-    "text": "string"
+    "text": "string" (optional),
+    "createdAt": "string",
+    "lastModified": "string"
   }
 ]
 ```
@@ -748,45 +766,11 @@ Now, analyze the following Concept Implementation and generate the API documenta
   "error": "string"
 }
 ```
+
 ---
-
-### POST /api/Review/_getAverageRating
-
-**Description:** Returns the average rating for a specific target.
-
-**Requirements:**
-- `target` exists
-
-**Effects:**
-- returns the average rating for `target`
-
-**Request Body:**
-```json
-{
-  "target": "string"
-}
-```
-
-**Success Response Body (Query):**
-```json
-[
-  {
-    "averageRating": "number"
-  }
-]
-```
-
-**Error Response Body:**
-```json
-{
-  "error": "string"
-}
-```
----
-
 # API Specification: Session Concept
 
-**Purpose:** support authentication and user state across multiple requests via session tokens
+**Purpose:** provide temporary, authenticated access to a user's account for a limited duration
 
 ---
 
@@ -794,28 +778,32 @@ Now, analyze the following Concept Implementation and generate the API documenta
 
 ### POST /api/Session/createSession
 
-**Description:** Creates a new session for a user with a specified duration, returning a session ID.
+**Description:** Creates a new session for a user with a specified duration.
 
 **Requirements:**
-- `user` exists; `durationMs` is a positive number
+- `user` exists
+- `durationHours` is a positive number
 
 **Effects:**
-- creates a new `Session` `s`; sets `user` of `s` to `user`;
-- sets `expiryTime` of `s` to current time + `durationMs`;
-- returns `s` as `session`
+- creates a new Session `s`
+- sets `s.user` to `user`
+- sets `s.createdAt` to the current time
+- sets `s.expiresAt` to `durationHours` from now
+- returns `s` as `session` and `s.expiresAt` as `expiresAt`
 
 **Request Body:**
 ```json
 {
   "user": "string",
-  "durationMs": "number"
+  "durationHours": "number"
 }
 ```
 
 **Success Response Body (Action):**
 ```json
 {
-  "session": "string"
+  "session": "string",
+  "expiresAt": "string"
 }
 ```
 
@@ -825,23 +813,23 @@ Now, analyze the following Concept Implementation and generate the API documenta
   "error": "string"
 }
 ```
+
 ---
 
-### POST /api/Session/endSession
+### POST /api/Session/deleteSession
 
-**Description:** Ends an active session by deleting it, provided the correct user is specified and the session is not expired.
+**Description:** Deletes an existing session.
 
 **Requirements:**
-- `session` exists and `user` is its user and session is not expired
+- the `session` exists
 
 **Effects:**
-- deletes `session`
+- deletes the `session`
 
 **Request Body:**
 ```json
 {
-  "session": "string",
-  "user": "string"
+  "session": "string"
 }
 ```
 
@@ -856,17 +844,47 @@ Now, analyze the following Concept Implementation and generate the API documenta
   "error": "string"
 }
 ```
+
 ---
 
-### POST /api/Session/_getSessionUser
+### POST /api/Session/deleteExpiredSessions
 
-**Description:** Returns the user associated with a given active session.
+**Description:** Deletes all sessions where `expiresAt` is in the past.
 
 **Requirements:**
-- `session` exists and is not expired
+- current time is after `expiresAt` for one or more sessions
 
 **Effects:**
-- returns the `user` associated with `session`
+- deletes all sessions where `expiresAt` is in the past
+
+**Request Body:**
+```json
+{}
+```
+
+**Success Response Body (Action):**
+```json
+{}
+```
+
+**Error Response Body:**
+```json
+{
+  "error": "string"
+}
+```
+
+---
+
+### POST /api/Session/_getSessionById
+
+**Description:** Returns the details of a specific session by its ID.
+
+**Requirements:**
+- the `session` exists
+
+**Effects:**
+- returns the details of the session: user, creation date, and expiration date
 
 **Request Body:**
 ```json
@@ -879,7 +897,9 @@ Now, analyze the following Concept Implementation and generate the API documenta
 ```json
 [
   {
-    "user": "string"
+    "user": "string",
+    "createdAt": "string",
+    "expiresAt": "string"
   }
 ]
 ```
@@ -890,60 +910,35 @@ Now, analyze the following Concept Implementation and generate the API documenta
   "error": "string"
 }
 ```
+
 ---
 
-### POST /api/Session/_getSessionExpiry
+### POST /api/Session/_getSessionsByUser
 
-**Description:** Returns the expiration timestamp of a given active session.
-
-**Requirements:**
-- `session` exists and is not expired
-
-**Effects:**
-- returns the `expiryTime` of `session`
-
-**Request Body:**
-```json
-{
-  "session": "string"
-}
-```
-
-**Success Response Body (Query):**
-```json
-[
-  {
-    "expiryTime": "number"
-  }
-]
-```
-
-**Error Response Body:**
-```json
-{
-  "error": "string"
-}
-```
----
-
-### POST /api/Session/cleanupExpiredSessions
-
-**Description:** Deletes all sessions that have passed their expiration time.
+**Description:** Returns a list of all active sessions for a given user.
 
 **Requirements:**
 - true
 
 **Effects:**
-- deletes all expired sessions
+- returns a list of all active sessions for a given `user`, including their ID, creation date, and expiration date
 
 **Request Body:**
 ```json
-{}
+{
+  "user": "string"
+}
 ```
 
-**Success Response Body (Action):**
+**Success Response Body (Query):**
 ```json
-{}
+[
+  {
+    "session": "string",
+    "createdAt": "string",
+    "expiresAt": "string"
+  }
+]
 ```
 
 **Error Response Body:**
@@ -952,11 +947,46 @@ Now, analyze the following Concept Implementation and generate the API documenta
   "error": "string"
 }
 ```
+
 ---
 
+### POST /api/Session/_isSessionValid
+
+**Description:** Returns `true` if the session exists and has not expired, `false` otherwise.
+
+**Requirements:**
+- true
+
+**Effects:**
+- returns `true` if the session exists and has not expired, `false` otherwise
+
+**Request Body:**
+```json
+{
+  "session": "string"
+}
+```
+
+**Success Response Body (Query):**
+```json
+[
+  {
+    "isValid": "boolean"
+  }
+]
+```
+
+**Error Response Body:**
+```json
+{
+  "error": "string"
+}
+```
+
+---
 # API Specification: UserAuthentication Concept
 
-**Purpose:** allow users to register with a unique username and password, and then login to authenticate
+**Purpose:** provide secure authentication for users with usernames and passwords
 
 ---
 
@@ -964,14 +994,17 @@ Now, analyze the following Concept Implementation and generate the API documenta
 
 ### POST /api/UserAuthentication/register
 
-**Description:** Registers a new user with a unique username and password.
+**Description:** Registers a new user with a unique username and a password.
 
 **Requirements:**
-- `username` is unique; `password` meets complexity requirements (e.g., min length)
+- `username` is unique and not empty
+- `password` meets complexity requirements (e.g., min length)
 
 **Effects:**
-- creates a new `User` `u`; sets `username` of `u` to `username`;
-- sets `password` of `u` to a hashed version of `password`; returns `u` as `user`
+- creates a new User `u`
+- sets `u.username` to `username`
+- hashes `password` and sets `u.passwordHash`
+- returns `u` as `user`
 
 **Request Body:**
 ```json
@@ -994,17 +1027,19 @@ Now, analyze the following Concept Implementation and generate the API documenta
   "error": "string"
 }
 ```
+
 ---
 
 ### POST /api/UserAuthentication/login
 
-**Description:** Authenticates a user with a username and password, returning the user ID on success.
+**Description:** Authenticates a user with their username and password.
 
 **Requirements:**
 - `username` and `password` match an existing user
 
 **Effects:**
-- returns the `user` if credentials are valid
+- authenticates the user
+- returns the User ID as `user`
 
 **Request Body:**
 ```json
@@ -1027,17 +1062,19 @@ Now, analyze the following Concept Implementation and generate the API documenta
   "error": "string"
 }
 ```
+
 ---
 
 ### POST /api/UserAuthentication/changePassword
 
-**Description:** Allows a user to change their password, requiring the old password for verification.
+**Description:** Changes the password for an existing user.
 
 **Requirements:**
-- `user` exists; `oldPassword` matches current password of `user`; `newPassword` meets complexity requirements
+- the `user` exists and `oldPassword` is correct
+- `newPassword` meets complexity requirements and is different from `oldPassword`
 
 **Effects:**
-- sets `password` of `user` to a hashed version of `newPassword`
+- updates the `passwordHash` for the `user` to `newPasswordHash`
 
 **Request Body:**
 ```json
@@ -1059,17 +1096,84 @@ Now, analyze the following Concept Implementation and generate the API documenta
   "error": "string"
 }
 ```
+
+---
+
+### POST /api/UserAuthentication/deleteUser
+
+**Description:** Deletes an existing user account.
+
+**Requirements:**
+- the `user` exists
+
+**Effects:**
+- deletes the `user`
+
+**Request Body:**
+```json
+{
+  "user": "string"
+}
+```
+
+**Success Response Body (Action):**
+```json
+{}
+```
+
+**Error Response Body:**
+```json
+{
+  "error": "string"
+}
+```
+
+---
+
+### POST /api/UserAuthentication/_getUserByUsername
+
+**Description:** Returns the User ID associated with the given username.
+
+**Requirements:**
+- true
+
+**Effects:**
+- returns the User ID associated with the given `username`, or an empty array if not found
+
+**Request Body:**
+```json
+{
+  "username": "string"
+}
+```
+
+**Success Response Body (Query):**
+```json
+[
+  {
+    "user": "string"
+  }
+]
+```
+
+**Error Response Body:**
+```json
+{
+  "error": "string"
+}
+```
+
 ---
 
 ### POST /api/UserAuthentication/_getUsername
 
-**Description:** Returns the username for a given user ID.
+**Description:** Returns the username of the user.
 
 **Requirements:**
-- `user` exists
+- the `user` exists
 
 **Effects:**
-- returns the `username` of `user`
+- returns the username of the `user`
 
 **Request Body:**
 ```json
@@ -1093,38 +1197,3 @@ Now, analyze the following Concept Implementation and generate the API documenta
   "error": "string"
 }
 ```
----
-
-### POST /api/UserAuthentication/_userExists
-
-**Description:** Checks if a user with the specified username exists.
-
-**Requirements:**
-- true
-
-**Effects:**
-- returns `true` if a user with `username` exists, `false` otherwise
-
-**Request Body:**
-```json
-{
-  "username": "string"
-}
-```
-
-**Success Response Body (Query):**
-```json
-[
-  {
-    "exists": "boolean"
-  }
-]
-```
-
-**Error Response Body:**
-```json
-{
-  "error": "string"
-}
-```
----

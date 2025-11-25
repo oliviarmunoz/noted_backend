@@ -36,6 +36,17 @@ export const inclusions: Record<string, string> = {
   "/api/MusicDiscovery/loadEntityDetails": "searching is public",
   "/api/MusicDiscovery/_getSearchResults": "searching is public",
   "/api/MusicDiscovery/_getEntityFromUri": "searching is public",
+
+  // UserAuthentication
+  "/api/UserAuthentication/register": "public",
+  "/api/UserAuthentication/authenticate": "public",
+  "/api/UserAuthentication/_getUsername": "public",
+  "/api/UserAuthentication/_getUserByUsername": "public",
+
+  // Session
+  "/api/Session/create": "public",
+  "/api/Session/delete": "public",
+  "/api/Session/_getUser": "public",
 };
 
 /**

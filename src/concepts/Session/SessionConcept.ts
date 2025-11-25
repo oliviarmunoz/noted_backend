@@ -19,13 +19,13 @@ interface SessionDoc {
   user: User;
 }
 
-const PREFIX = "Sessioning" + ".";
+const PREFIX = "Session" + ".";
 
 /**
- * @concept Sessioning
+ * @concept Session
  * @purpose To maintain a user's logged-in state across multiple requests without re-sending credentials.
  */
-export default class SessioningConcept {
+export default class SessionConcept {
   public readonly sessions: Collection<SessionDoc>;
 
   constructor(private readonly db: Db) {
