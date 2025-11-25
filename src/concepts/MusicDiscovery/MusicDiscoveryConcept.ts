@@ -71,21 +71,26 @@ export default class MusicDiscoveryConcept {
   /**
    * Helper to upsert a spotify item into our local MusicEntities state
    */
-  private async upsertSpotifyItem(item: any, type: "track" | "album" | "artist"): Promise<MusicEntityID> {
+  private async upsertSpotifyItem(
+    item: any,
+    type: "track" | "album" | "artist"
+  ): Promise<MusicEntityID> {
     const existing = await this.entities.findOne({ externalId: item.id });
 
     // Safely extract image
     let imageUrl = "";
     if (item.images && item.images.length > 0) imageUrl = item.images[0].url;
-    else if (item.album && item.album.images && item.album.images.length > 0) imageUrl = item.album.images[0].url;
+    else if (item.album && item.album.images && item.album.images.length > 0)
+      imageUrl = item.album.images[0].url;
 
     // Safely extract artist name
     let artistName = "";
-    if (item.artists && item.artists.length > 0) artistName = item.artists[0].name;
+    if (item.artists && item.artists.length > 0)
+      artistName = item.artists[0].name;
 
     // Determine description based on type
     let description = "";
-    if (type === 'artist') {
+    if (type === "artist") {
       description = (item.genres || []).join(", ");
     } else {
       description = item.type;
@@ -97,7 +102,7 @@ export default class MusicDiscoveryConcept {
       if (imageUrl) updates.imageUrl = imageUrl;
       if (item.release_date) updates.releaseDate = item.release_date;
       // We don't overwrite description if it exists, as loadEntityDetails might have fetched a better one
-      
+
       await this.entities.updateOne({ _id: existing._id }, { $set: updates });
       return existing._id;
     }
@@ -114,7 +119,7 @@ export default class MusicDiscoveryConcept {
       description,
       durationMs: item.duration_ms,
       releaseDate: item.release_date,
-      artistName
+      artistName,
     });
 
     return _id;
@@ -122,11 +127,17 @@ export default class MusicDiscoveryConcept {
 
   /**
    * search (user: User, query: String): (musicEntities: MusicEntity[])
-   * 
+   *
    * **requires** query is not empty
    * **effects** updates lastQuery of user, removes all SearchResults for user, fetches data from external service, creates/updates MusicEntities based on results, creates SearchResults linking user to the new entities
    */
-  async search({ user, query }: { user: User; query: string }): Promise<{ musicEntities: MusicEntity[] } | { error: string }> {
+  async search({
+    user,
+    query,
+  }: {
+    user: User;
+    query: string;
+  }): Promise<{ musicEntities: MusicEntity[] } | { error: string }> {
     if (!query) return { error: "Query cannot be empty" };
 
     // Update User State
@@ -167,24 +178,26 @@ export default class MusicDiscoveryConcept {
     }
 
     // Link to User
-    const resultDocs = resultIds.map(entityId => ({
+    const resultDocs = resultIds.map((entityId) => ({
       _id: freshID(),
       user,
-      entity: entityId
+      entity: entityId,
     }));
 
     if (resultDocs.length > 0) {
       await this.searchResults.insertMany(resultDocs);
     }
-    
+
     // Return the entities found (Action return, not Query)
-    const entities = await this.entities.find({ _id: { $in: resultIds } }).toArray();
+    const entities = await this.entities
+      .find({ _id: { $in: resultIds } })
+      .toArray();
     return { musicEntities: entities };
   }
 
   /**
    * clearSearch (user: User): ()
-   * 
+   *
    * **effects** removes all SearchResults where owner is user
    */
   async clearSearch({ user }: { user: User }): Promise<Empty> {
@@ -196,21 +209,32 @@ export default class MusicDiscoveryConcept {
 
   /**
    * loadEntityDetails (externalId: String, type: String): (music: MusicEntity)
-   * 
+   *
    * **requires** externalId is valid
    * **effects** fetches detailed info from external service, updates the specific MusicEntity with richer data, and returns the corresponding MusicEntity
    */
-  async loadEntityDetails({ externalId, type }: { externalId: string, type: string }): Promise<{ music: MusicEntity } | { error: string }> {
+  async loadEntityDetails({
+    externalId,
+    type,
+  }: {
+    externalId: string;
+    type: string;
+  }): Promise<{ music: MusicEntity } | { error: string }> {
     let musicEntityId: MusicEntityID;
-    
+
     try {
       let data;
-      if (type === 'track') data = await spotifyService.getTrack(externalId);
-      else if (type === 'album') data = await spotifyService.getAlbum(externalId);
-      else if (type === 'artist') data = await spotifyService.getArtist(externalId);
+      if (type === "track") data = await spotifyService.getTrack(externalId);
+      else if (type === "album")
+        data = await spotifyService.getAlbum(externalId);
+      else if (type === "artist")
+        data = await spotifyService.getArtist(externalId);
       else return { error: "Invalid type. Must be track, album, or artist." };
 
-      musicEntityId = await this.upsertSpotifyItem(data, type as "track" | "album" | "artist");
+      musicEntityId = await this.upsertSpotifyItem(
+        data,
+        type as "track" | "album" | "artist"
+      );
     } catch (e: any) {
       return { error: `Spotify Error: ${e.message}` };
     }
@@ -225,28 +249,48 @@ export default class MusicDiscoveryConcept {
 
   /**
    * _getSearchResults (user: User): (musicEntities: MusicEntity[])
-   * 
+   *
    * **returns** the music entities tied to the search results that correspond to the given user
    */
-  async _getSearchResults({ user }: { user: User }): Promise<{ musicEntity: MusicEntity }[]> {
+  async _getSearchResults({
+    user,
+  }: {
+    user: User;
+  }): Promise<{ musicEntity: MusicEntity }[]> {
     const results = await this.searchResults.find({ user }).toArray();
-    const entityIds = results.map(r => r.entity);
+    const entityIds = results.map((r) => r.entity);
 
     // Single DB call
-    const entities = await this.entities.find({ _id: { $in: entityIds } }).toArray();
+    const entities = await this.entities
+      .find({ _id: { $in: entityIds } })
+      .toArray();
 
     // Return as array of dictionaries with field matching the singular of the requested data,
-    // or typically we map to the object itself. 
+    // or typically we map to the object itself.
     // Following the pattern: return array of objects { musicEntity: ... }
-    return entities.map(e => ({ musicEntity: e }));
+    return entities.map((e) => ({ musicEntity: e }));
+  }
+
+  async _getEntity({
+    id,
+  }: {
+    id: MusicEntityID;
+  }): Promise<{ musicEntity: MusicEntity }[]> {
+    const entity = await this.entities.findOne({ _id: id });
+    if (!entity) return [];
+    return [{ musicEntity: entity }];
   }
 
   /**
    * _getEntityFromId (externalId: String): (musicEntity: MusicEntity)
-   * 
+   *
    * **returns** the music entity with the given external id
    */
-  async _getEntityFromId({ externalId }: { externalId: string }): Promise<{ musicEntity: MusicEntity }[]> {
+  async _getEntityFromId({
+    externalId,
+  }: {
+    externalId: string;
+  }): Promise<{ musicEntity: MusicEntity }[]> {
     const entity = await this.entities.findOne({ externalId });
     if (!entity) return [];
     return [{ musicEntity: entity }];
@@ -254,10 +298,14 @@ export default class MusicDiscoveryConcept {
 
   /**
    * _getEntityFromUri (uri: String): (musicEntity: MusicEntity)
-   * 
+   *
    * **returns** the music entity with the given external uri
    */
-  async _getEntityFromUri({ uri }: { uri: string }): Promise<{ musicEntity: MusicEntity }[]> {
+  async _getEntityFromUri({
+    uri,
+  }: {
+    uri: string;
+  }): Promise<{ musicEntity: MusicEntity }[]> {
     const entity = await this.entities.findOne({ uri });
     if (!entity) return [];
     return [{ musicEntity: entity }];
