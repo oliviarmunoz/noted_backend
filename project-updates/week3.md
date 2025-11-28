@@ -2,24 +2,24 @@
 
 ## Agenda
 
-- Feedback on concepts
+- Feedback on Alpha
 - Advice on where to put Spotify API calls
-- Advice/suggestions before MVP tomorrow
+- Advice/suggestions for Beta
 
 ## Progress Report
 
-- Implementing incrementally - we are sticking to our development plan but made some slight changes to balance the workload
-- Planning to submit MVP tomorrow and work on Beta throughout the week
+- Completed MVP, seems to be functioning well so far
 
 ## Design Changes
 
-- In the process of deciding where to put the Spotify API calls, potentially in a new concept?
+- Put calls to Spotify API in a new concept called MusicDiscovery
+- Reassigned/rearranged tasks in the original development plan to complete MVP
 
 ## Issues
 
-- None so far, working through first MVP
+- None so far, working to fix small UI bugs in the Beta check-in
 
 ## Plans & Decisions
 
-- Implemented concepts based on the specs from functional design assignment
-- Basic UI follows design study and UI sketches
+- Beta check-in will be more of a second iteration, with each member refining their task in the Alpha
+- Attempting music recommendations as a stretch goal
