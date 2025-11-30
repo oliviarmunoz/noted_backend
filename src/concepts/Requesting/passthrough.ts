@@ -63,4 +63,6 @@ export const exclusions: Array<string> = [
   // Feel free to delete these example exclusions
   "/api/LikertSurvey/createSurvey",
   "/api/LikertSurvey/addQuestion",
+  "/api/Playlist/createPlaylist",
+  "/api/Playlist/deletePlaylist"
 ];
