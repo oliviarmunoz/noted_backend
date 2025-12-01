@@ -31,6 +31,7 @@ export interface MusicEntity {
   releaseDate?: string;
   durationMs?: number;
   artistName?: string;
+  externalURL?: string;
 }
 
 /**
@@ -101,6 +102,8 @@ export default class MusicDiscoveryConcept {
       const updates: Partial<MusicEntity> = {};
       if (imageUrl) updates.imageUrl = imageUrl;
       if (item.release_date) updates.releaseDate = item.release_date;
+      if (item.external_urls?.spotify)
+        updates.externalURL = item.external_urls.spotify;
       // We don't overwrite description if it exists, as loadEntityDetails might have fetched a better one
 
       await this.entities.updateOne({ _id: existing._id }, { $set: updates });
@@ -109,6 +112,10 @@ export default class MusicDiscoveryConcept {
 
     const _id = freshID();
 
+    // Safely extract external URL
+    const externalURL = item.external_urls?.spotify || "";
+
+    console.log("externalURL", externalURL);
     await this.entities.insertOne({
       _id,
       externalId: item.id,
@@ -120,6 +127,7 @@ export default class MusicDiscoveryConcept {
       durationMs: item.duration_ms,
       releaseDate: item.release_date,
       artistName,
+      externalURL,
     });
 
     return _id;
