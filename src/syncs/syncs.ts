@@ -4,11 +4,23 @@
 
 import type { Sync } from "@engine";
 
+import * as sync_UserAuthentication from "./UserAuthentication.sync.ts";
+import * as sync_Playlist from "./Playlist.sync.ts";
 import * as sync_sample from "./sample.sync.ts";
 
 const allSyncs: Record<string, Sync> = {};
 
 
+for (const [name, func] of Object.entries(sync_UserAuthentication)) {
+  if (typeof func === "function") {
+    allSyncs[`UserAuthentication.${name}`] = func as Sync;
+  }
+}
+for (const [name, func] of Object.entries(sync_Playlist)) {
+  if (typeof func === "function") {
+    allSyncs[`Playlist.${name}`] = func as Sync;
+  }
+}
 for (const [name, func] of Object.entries(sync_sample)) {
   if (typeof func === "function") {
     allSyncs[`sample.${name}`] = func as Sync;

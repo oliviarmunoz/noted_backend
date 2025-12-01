@@ -38,15 +38,13 @@ export const inclusions: Record<string, string> = {
   "/api/MusicDiscovery/_getEntityFromUri": "searching is public",
 
   // UserAuthentication
-  "/api/UserAuthentication/register": "public",
-  "/api/UserAuthentication/authenticate": "public",
-  "/api/UserAuthentication/_getUsername": "public",
-  "/api/UserAuthentication/_getUserByUsername": "public",
+  "/api/UserAuthentication/_getUserByUsername":
+    "allow anyone to get a user by username (public query)",
+  "/api/UserAuthentication/_getUsername":
+    "allow anyone to get a username by user id (public query)",
 
   // Session
-  "/api/Session/create": "public",
-  "/api/Session/delete": "public",
-  "/api/Session/_getUser": "public",
+  "/api/Session/_getUser": "allow anyone to get a user by session id (public query)"
 };
 
 /**
@@ -60,7 +58,10 @@ export const inclusions: Record<string, string> = {
  */
 
 export const exclusions: Array<string> = [
-  // Feel free to delete these example exclusions
-  "/api/LikertSurvey/createSurvey",
-  "/api/LikertSurvey/addQuestion",
+  "/api/Session/create",
+  "/api/Session/delete",
+  "/api/UserAuthentication/register",
+  "/api/UserAuthentication/authenticate",
+  "/api/Playlist/createPlaylist",
+  "/api/Playlist/deletePlaylist"
 ];
