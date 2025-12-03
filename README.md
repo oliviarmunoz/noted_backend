@@ -17,5 +17,6 @@ Noted is a social app for sharing and discovering music. Rate what you’ve been
 - [Problem Framing](assignments/problem-framing/problem-framing.md)
 - [Project Pitch](https://drive.google.com/file/d/1KCP_4ZsTT379YIRB6WZqXCcdx9G-9s2r/view?usp=sharing)
 - [Functional Design](assignments/functional-design/functional-design.md)
-- [Development Plan Update](assignments/development-plan-update/development-plan-update.md)
+- [Alpha Development Plan Update](assignments/development-plan-update/alpha-update.md)
 - [Alpha Demo](https://youtu.be/Q7_cvWgk55g)
+- [Beta Development Plan Update](assignments/development-plan-update/beta-update.md)
