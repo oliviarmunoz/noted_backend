@@ -1,3 +1,12 @@
+---
+timestamp: 'Mon Dec 01 2025 23:26:19 GMT-0500 (Eastern Standard Time)'
+parent: '[[../20251201_232619.345da438.md]]'
+content_id: 7123942d8f31563cf81ce7fbc26b54f884a1783adaec5da47a7005e342966941
+---
+
+# file: src/concepts/MusicDiscovery/MusicDiscoveryConcept.ts
+
+```typescript
 import { Collection, Db } from "npm:mongodb";
 import { Empty, ID } from "@utils/types.ts";
 import { freshID } from "@utils/database.ts";
@@ -11,9 +20,6 @@ type User = ID;
 
 // Internal entity IDs for relationships and references
 type MusicItem = ID;
-type Track = ID;
-type Album = ID;
-type Artist = ID;
 
 // Unified interface for all music entities in the base 'MusicItems' collection
 interface MusicItemDoc {
@@ -29,25 +35,25 @@ interface MusicItemDoc {
 
 // Interfaces for subset collections, extending MusicItemDoc
 interface TrackDoc extends MusicItemDoc {
-  _id: Track;
+  _id: MusicItem; // Can also be referred to as Track
   type: "track";
   durationMs: number;
-  albumId?: Album; // Internal ID link to Album
-  artistId?: Artist; // Internal ID link to primary Artist
+  albumId?: MusicItem; // Internal ID link to Album
+  artistId?: MusicItem; // Internal ID link to primary Artist
 }
 
 interface AlbumDoc extends MusicItemDoc {
-  _id: Album;
+  _id: MusicItem; // Can also be referred to as Album
   type: "album";
   releaseDate: string;
-  artistId?: Artist; // Internal ID link to primary Artist
+  artistId?: MusicItem; // Internal ID link to primary Artist
   totalTracks: number;
 }
 
 interface ArtistDoc extends MusicItemDoc {
-  _id: Artist;
+  _id: MusicItem; // Can also be referred to as Artist
   type: "artist";
-  albums?: Album[]; // Internal ID links to Albums by this artist, representing "an Albums set of MusicItems"
+  albums?: MusicItem[]; // Internal ID links to Albums by this artist, representing "an Albums set of MusicItems"
 }
 
 // User-specific data managed by this concept
@@ -87,16 +93,19 @@ export default class MusicDiscoveryConcept {
    * @param spotifyTrack - Raw Spotify track object
    * @returns The internal ID of the upserted track.
    */
-  private async _upsertTrack(spotifyTrack: any): Promise<Track> {
+  private async _upsertTrack(spotifyTrack: any): Promise<MusicItem> {
+    if (!spotifyTrack?.id) {
+      throw new Error("Invalid Spotify track data: missing ID.");
+    }
     const existingTrack = await this.tracks.findOne({ externalId: spotifyTrack.id });
-    const trackId: Track = existingTrack ? existingTrack._id : freshID() as Track;
+    const trackId: MusicItem = existingTrack ? existingTrack._id : freshID() as MusicItem;
 
-    let albumId: Album | undefined;
+    let albumId: MusicItem | undefined;
     if (spotifyTrack.album) {
       albumId = await this._upsertAlbum(spotifyTrack.album);
     }
 
-    let artistId: Artist | undefined;
+    let artistId: MusicItem | undefined;
     if (spotifyTrack.artists && spotifyTrack.artists.length > 0) {
       artistId = await this._upsertArtist(spotifyTrack.artists[0]); // Primary artist
     }
@@ -109,7 +118,7 @@ export default class MusicDiscoveryConcept {
       imageUrl: spotifyTrack.album?.images?.[0]?.url,
       externalUrl: spotifyTrack.external_urls?.spotify,
       type: "track",
-      durationMs: spotifyTrack.duration_ms,
+      durationMs: spotifyTrack.duration_ms || 0, // Default to 0 if not provided
       albumId: albumId,
       artistId: artistId,
     };
@@ -126,11 +135,14 @@ export default class MusicDiscoveryConcept {
    * @param spotifyAlbum - Raw Spotify album object
    * @returns The internal ID of the upserted album.
    */
-  private async _upsertAlbum(spotifyAlbum: any): Promise<Album> {
+  private async _upsertAlbum(spotifyAlbum: any): Promise<MusicItem> {
+    if (!spotifyAlbum?.id) {
+      throw new Error("Invalid Spotify album data: missing ID.");
+    }
     const existingAlbum = await this.albums.findOne({ externalId: spotifyAlbum.id });
-    const albumId: Album = existingAlbum ? existingAlbum._id : freshID() as Album;
+    const albumId: MusicItem = existingAlbum ? existingAlbum._id : freshID() as MusicItem;
 
-    let artistId: Artist | undefined;
+    let artistId: MusicItem | undefined;
     if (spotifyAlbum.artists && spotifyAlbum.artists.length > 0) {
       artistId = await this._upsertArtist(spotifyAlbum.artists[0]); // Primary artist
     }
@@ -143,9 +155,9 @@ export default class MusicDiscoveryConcept {
       imageUrl: spotifyAlbum.images?.[0]?.url,
       externalUrl: spotifyAlbum.external_urls?.spotify,
       type: "album",
-      releaseDate: spotifyAlbum.release_date,
+      releaseDate: spotifyAlbum.release_date || "unknown",
       artistId: artistId,
-      totalTracks: spotifyAlbum.total_tracks,
+      totalTracks: spotifyAlbum.total_tracks || 0, // Default to 0 if not provided
     };
 
     await this.musicItems.updateOne({ _id: albumId }, { $set: albumDoc }, { upsert: true });
@@ -159,9 +171,12 @@ export default class MusicDiscoveryConcept {
    * @param spotifyArtist - Raw Spotify artist object
    * @returns The internal ID of the upserted artist.
    */
-  private async _upsertArtist(spotifyArtist: any): Promise<Artist> {
+  private async _upsertArtist(spotifyArtist: any): Promise<MusicItem> {
+    if (!spotifyArtist?.id) {
+      throw new Error("Invalid Spotify artist data: missing ID.");
+    }
     const existingArtist = await this.artists.findOne({ externalId: spotifyArtist.id });
-    const artistId: Artist = existingArtist ? existingArtist._id : freshID() as Artist;
+    const artistId: MusicItem = existingArtist ? existingArtist._id : freshID() as MusicItem;
 
     const artistDoc: ArtistDoc = {
       _id: artistId,
@@ -171,7 +186,7 @@ export default class MusicDiscoveryConcept {
       imageUrl: spotifyArtist.images?.[0]?.url,
       externalUrl: spotifyArtist.external_urls?.spotify,
       type: "artist",
-      // albums will be populated by loadArtistAlbums action
+      albums: [], // Initialize empty, populated by loadArtistAlbums action
     };
 
     await this.musicItems.updateOne({ _id: artistId }, { $set: artistDoc }, { upsert: true });
@@ -191,19 +206,30 @@ export default class MusicDiscoveryConcept {
 
   /**
    * @action search (user: User, query: String, type: String): (items: MusicItem[])
-   * @requires `query` is not empty.
+   * @requires `query` is not empty. `type` is one of "track", "album", "artist", or a comma-separated combination.
    * @effects Fetches matches from provider. Upserts items into the `MusicItems` set
-   *          (and appropriate subsets based on type). Replaces `user`'s `searchResults`
-   *          with these items. Returns the items.
+   *          (and appropriate subsets based on type), generating internal IDs.
+   *          Replaces `user`'s `searchResults` with these internal item IDs. Returns the full `MusicItem` objects.
    */
   async search({ user, query, type }: { user: User; query: string; type: string }): Promise<{ items: MusicItemDoc[] } | { error: string }> {
     if (!query) {
       return { error: "Query cannot be empty." };
     }
+    // Basic validation for type, Spotify API handles more complex combinations
+    const validTypes = ["track", "album", "artist", "playlist"];
+    const typesArray = type.split(",").map(t => t.trim().toLowerCase());
+    if (!typesArray.every(t => validTypes.includes(t))) {
+      // return { error: `Invalid search type(s): ${type}. Must be one of ${validTypes.join(", ")}.` }; // Simplified check, Spotify is more robust
+    }
 
     let spotifyResults: any;
     try {
-      spotifyResults = await spotifyService.search({ query, type });
+      // Use spotifyService.smartSearch for broader searches if type is not specific (i.e. if it's "track,album,artist")
+      if (type === "track,album,artist" || type === "all") {
+        spotifyResults = await spotifyService.smartSearch(query);
+      } else {
+        spotifyResults = await spotifyService.search({ query, type });
+      }
     } catch (e: unknown) { // Explicitly type 'e' as unknown
       return { error: `Failed to search Spotify: ${(e instanceof Error ? e.message : String(e))}` };
     }
@@ -214,30 +240,42 @@ export default class MusicDiscoveryConcept {
     // Process tracks
     if (spotifyResults.tracks?.items) {
       for (const track of spotifyResults.tracks.items) {
-        const trackId = await this._upsertTrack(track);
-        const item = await this._getMusicItemById(trackId);
-        if (item) returnedItems.push(item);
-        upsertedItemIds.push(trackId);
+        try {
+          const trackId = await this._upsertTrack(track);
+          const item = await this._getMusicItemById(trackId);
+          if (item) returnedItems.push(item);
+          upsertedItemIds.push(trackId);
+        } catch (e) {
+          console.warn(`Failed to upsert track ${track?.id}: ${e}`);
+        }
       }
     }
 
     // Process albums
     if (spotifyResults.albums?.items) {
       for (const album of spotifyResults.albums.items) {
-        const albumId = await this._upsertAlbum(album);
-        const item = await this._getMusicItemById(albumId);
-        if (item) returnedItems.push(item);
-        upsertedItemIds.push(albumId);
+        try {
+          const albumId = await this._upsertAlbum(album);
+          const item = await this._getMusicItemById(albumId);
+          if (item) returnedItems.push(item);
+          upsertedItemIds.push(albumId);
+        } catch (e) {
+          console.warn(`Failed to upsert album ${album?.id}: ${e}`);
+        }
       }
     }
 
     // Process artists
     if (spotifyResults.artists?.items) {
       for (const artist of spotifyResults.artists.items) {
-        const artistId = await this._upsertArtist(artist);
-        const item = await this._getMusicItemById(artistId);
-        if (item) returnedItems.push(item);
-        upsertedItemIds.push(artistId);
+        try {
+          const artistId = await this._upsertArtist(artist);
+          const item = await this._getMusicItemById(artistId);
+          if (item) returnedItems.push(item);
+          upsertedItemIds.push(artistId);
+        } catch (e) {
+          console.warn(`Failed to upsert artist ${artist?.id}: ${e}`);
+        }
       }
     }
 
@@ -265,9 +303,9 @@ export default class MusicDiscoveryConcept {
   }
 
   /**
-   * @action loadTrack (externalId: String): (track: Track)
-   * @requires `externalId` is a valid track ID.
-   * @effects Fetches details. Upserts into `Tracks` subset. Returns the track.
+   * @action loadTrack (externalId: String): (track: MusicItem)
+   * @requires `externalId` is a valid track ID from the external provider.
+   * @effects Fetches detailed track information from the provider. Upserts the track into `Tracks` subset (and `MusicItems`). Returns the full `Track` object.
    */
   async loadTrack({ externalId }: { externalId: string }): Promise<{ track: TrackDoc } | { error: string }> {
     try {
@@ -282,9 +320,9 @@ export default class MusicDiscoveryConcept {
   }
 
   /**
-   * @action loadAlbum (externalId: String): (album: Album)
-   * @requires `externalId` is a valid album ID.
-   * @effects Fetches details. Upserts into `Albums` subset. Returns the album.
+   * @action loadAlbum (externalId: String): (album: MusicItem)
+   * @requires `externalId` is a valid album ID from the external provider.
+   * @effects Fetches detailed album information from the provider. Upserts the album into `Albums` subset (and `MusicItems`). Returns the full `Album` object.
    */
   async loadAlbum({ externalId }: { externalId: string }): Promise<{ album: AlbumDoc } | { error: string }> {
     try {
@@ -299,9 +337,9 @@ export default class MusicDiscoveryConcept {
   }
 
   /**
-   * @action loadArtist (externalId: String): (artist: Artist)
-   * @requires `externalId` is a valid artist ID.
-   * @effects Fetches details. Upserts into `Artists` subset. Returns the artist.
+   * @action loadArtist (externalId: String): (artist: MusicItem)
+   * @requires `externalId` is a valid artist ID from the external provider.
+   * @effects Fetches detailed artist information from the provider. Upserts the artist into `Artists` subset (and `MusicItems`). Returns the full `Artist` object.
    */
   async loadArtist({ externalId }: { externalId: string }): Promise<{ artist: ArtistDoc } | { error: string }> {
     try {
@@ -316,12 +354,12 @@ export default class MusicDiscoveryConcept {
   }
 
   /**
-   * @action loadAlbumTracks (albumId: String): (tracks: Track[])
-   * @requires `albumId` refers to a valid album.
-   * @effects Fetches tracks for the album. Upserts them into `Tracks` subset (linking them to the `albumId`).
-   *          Returns the tracks.
+   * @action loadAlbumTracks (albumId: MusicItem): (tracks: MusicItem[])
+   * @requires `albumId` refers to an existing album in the concept's state.
+   * @effects Fetches tracks for the specified album from the provider. Upserts them into `Tracks` subset (and `MusicItems`),
+   *          linking them to the `albumId`. Returns the full `Track` objects.
    */
-  async loadAlbumTracks({ albumId }: { albumId: Album }): Promise<{ tracks: TrackDoc[] } | { error: string }> {
+  async loadAlbumTracks({ albumId }: { albumId: MusicItem }): Promise<{ tracks: TrackDoc[] } | { error: string }> {
     const albumDoc = await this.albums.findOne({ _id: albumId });
     if (!albumDoc) {
       return { error: `Album with internal ID ${albumId} not found.` };
@@ -332,8 +370,7 @@ export default class MusicDiscoveryConcept {
       const upsertedTracks: TrackDoc[] = [];
       for (const spotifyTrack of spotifyTracksResult.items) {
         // The Spotify API's getAlbumTracks returns simplified track objects.
-        // We might need to fetch full track details if more info is needed,
-        // but for now, we'll try to upsert with what's available or fetch full details if externalId is present.
+        // We fetch full track details if externalId is present to ensure complete data.
         const fullSpotifyTrack = await spotifyService.getTrack(spotifyTrack.id);
         const trackId = await this._upsertTrack(fullSpotifyTrack);
         const trackDoc = await this.tracks.findOne({ _id: trackId });
@@ -346,12 +383,13 @@ export default class MusicDiscoveryConcept {
   }
 
   /**
-   * @action loadArtistAlbums (artistId: String): (albums: Album[])
-   * @requires `artistId` refers to a valid artist.
-   * @effects Fetches albums for the artist. Upserts them into `Albums` subset.
-   *          Updates the `ArtistDoc` with the associated albums. Returns the albums.
+   * @action loadArtistAlbums (artistId: MusicItem): (albums: MusicItem[])
+   * @requires `artistId` refers to an existing artist in the concept's state.
+   * @effects Fetches albums for the specified artist from the provider. Upserts them into `Albums` subset (and `MusicItems`),
+   *          linking them to the `artistId`. Updates the `Artists` record for `artistId` with the new album associations.
+   *          Returns the full `Album` objects.
    */
-  async loadArtistAlbums({ artistId }: { artistId: Artist }): Promise<{ albums: AlbumDoc[] } | { error: string }> {
+  async loadArtistAlbums({ artistId }: { artistId: MusicItem }): Promise<{ albums: AlbumDoc[] } | { error: string }> {
     const artistDoc = await this.artists.findOne({ _id: artistId });
     if (!artistDoc) {
       return { error: `Artist with internal ID ${artistId} not found.` };
@@ -360,7 +398,7 @@ export default class MusicDiscoveryConcept {
     try {
       const spotifyAlbumsResult = await spotifyService.getArtistAlbums(artistDoc.externalId);
       const upsertedAlbums: AlbumDoc[] = [];
-      const albumIds: Album[] = [];
+      const albumIds: MusicItem[] = [];
 
       for (const spotifyAlbum of spotifyAlbumsResult.items) {
         const albumId = await this._upsertAlbum(spotifyAlbum);
@@ -387,7 +425,7 @@ export default class MusicDiscoveryConcept {
 
   /**
    * @query _getSearchResults (user: User): (items: MusicItem[])
-   * @effects Returns the set of `MusicItems` currently linked to the user.
+   * @effects Returns the set of `MusicItem` objects currently linked as `searchResults` for the given user.
    */
   async _getSearchResults({ user }: { user: User }): Promise<{ items: MusicItemDoc[] }> {
     const userDoc = await this.users.findOne({ _id: user });
@@ -399,9 +437,8 @@ export default class MusicDiscoveryConcept {
   }
 
   /**
-   * @query _getTrack (externalId: String): (track: Track)
-   * @requires Item exists in `Tracks` subset.
-   * @effects Returns the track.
+   * @query _getTrack (externalId: String): (track: MusicItem)
+   * @effects Returns the `Track` object with the given external ID, if it exists in the concept's state.
    */
   async _getTrack({ externalId }: { externalId: string }): Promise<{ track: TrackDoc }[]> {
     const track = await this.tracks.findOne({ externalId });
@@ -409,9 +446,8 @@ export default class MusicDiscoveryConcept {
   }
 
   /**
-   * @query _getAlbum (externalId: String): (album: Album)
-   * @requires Item exists in `Albums` subset.
-   * @effects Returns the album.
+   * @query _getAlbum (externalId: String): (album: MusicItem)
+   * @effects Returns the `Album` object with the given external ID, if it exists in the concept's state.
    */
   async _getAlbum({ externalId }: { externalId: string }): Promise<{ album: AlbumDoc }[]> {
     const album = await this.albums.findOne({ externalId });
@@ -419,9 +455,8 @@ export default class MusicDiscoveryConcept {
   }
 
   /**
-   * @query _getArtist (externalId: String): (artist: Artist)
-   * @requires Item exists in `Artists` subset.
-   * @effects Returns the artist.
+   * @query _getArtist (externalId: String): (artist: MusicItem)
+   * @effects Returns the `Artist` object with the given external ID, if it exists in the concept's state.
    */
   async _getArtist({ externalId }: { externalId: string }): Promise<{ artist: ArtistDoc }[]> {
     const artist = await this.artists.findOne({ externalId });
@@ -429,26 +464,26 @@ export default class MusicDiscoveryConcept {
   }
 
   /**
-   * @query _getTracksByAlbum (albumId: String): (tracks: Track[])
-   * @effects Returns all items in `Tracks` where the `albumId` matches.
+   * @query _getTracksByAlbum (albumId: MusicItem): (tracks: MusicItem[])
+   * @effects Returns all `Track` objects that are linked to the given `albumId`.
    */
-  async _getTracksByAlbum({ albumId }: { albumId: Album }): Promise<{ tracks: TrackDoc[] }> {
+  async _getTracksByAlbum({ albumId }: { albumId: MusicItem }): Promise<{ tracks: TrackDoc[] }> {
     const tracks = await this.tracks.find({ albumId }).toArray();
     return { tracks: tracks };
   }
 
   /**
-   * @query _getAlbumsByArtist (artistId: String): (albums: Album[])
-   * @effects Returns all items in `Albums` where the `artistId` matches.
+   * @query _getAlbumsByArtist (artistId: MusicItem): (albums: MusicItem[])
+   * @effects Returns all `Album` objects that are linked to the given `artistId`.
    */
-  async _getAlbumsByArtist({ artistId }: { artistId: Artist }): Promise<{ albums: AlbumDoc[] }> {
+  async _getAlbumsByArtist({ artistId }: { artistId: MusicItem }): Promise<{ albums: AlbumDoc[] }> {
     const albums = await this.albums.find({ artistId }).toArray();
     return { albums: albums };
   }
 
   /**
    * @query _getItem (externalId: String): (item: MusicItem)
-   * @effects Returns the generic `MusicItem` (useful if you don't know the type yet).
+   * @effects Returns the generic `MusicItem` object (track, album, or artist) with the given external ID, if it exists.
    */
   async _getItem({ externalId }: { externalId: string }): Promise<{ item: MusicItemDoc }[]> {
     const item = await this.musicItems.findOne({ externalId });
@@ -456,11 +491,8 @@ export default class MusicDiscoveryConcept {
   }
 
   /**
-   * @query _getEntityFromId (externalId: String): (musicEntity: MusicEntity)
-   * @effects Returns the `MusicEntity` with the given external id.
-   * Note: This query returns a union type, which TypeScript handles, but concept design
-   * generally expects a consistent return structure. For simplicity and to match
-   * the dictionary return format, we'll return an array of generic MusicItemDoc.
+   * @query _getEntityFromId (externalId: String): (musicEntity: MusicItem)
+   * @effects Returns the generic `MusicItem` object (track, album, or artist) with the given external ID.
    */
   async _getEntityFromId({ externalId }: { externalId: string }): Promise<{ musicEntity: MusicItemDoc }[]> {
     const item = await this.musicItems.findOne({ externalId });
@@ -468,11 +500,14 @@ export default class MusicDiscoveryConcept {
   }
 
   /**
-   * @query _getEntityFromUri (uri: String): (musicEntity: MusicEntity)
-   * @effects Returns the `MusicEntity` with the given external uri.
+   * @query _getEntityFromUri (uri: String): (musicEntity: MusicItem)
+   * @effects Returns the generic `MusicItem` object (track, album, or artist) with the given URI.
    */
   async _getEntityFromUri({ uri }: { uri: string }): Promise<{ musicEntity: MusicItemDoc }[]> {
     const item = await this.musicItems.findOne({ uri });
     return item ? [{ musicEntity: item }] : [];
   }
 }
+```
+
+***

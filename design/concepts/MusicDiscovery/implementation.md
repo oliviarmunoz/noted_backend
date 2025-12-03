@@ -8,274 +8,487 @@
 
 [@example-implementation](../LikertSurvey/implementation.md)
 
-# implement MusicDiscovery
+[@spotify-api-implementation](../../../src/utils/spotify.ts)
 
-# file: src/concepts/MusicDiscovery/MusicDiscoveryConcept.ts
+# implement MusicDiscovery
 
 ```typescript
 import { Collection, Db } from "npm:mongodb";
 import { Empty, ID } from "@utils/types.ts";
 import { freshID } from "@utils/database.ts";
-import { spotifyService } from "@utils/spotify.ts";
+import { spotifyService } from "@utils/spotify.ts"; // Import the updated Spotify service
 
-const PREFIX = "MusicDiscovery.";
+// Declare collection prefix, use concept name
+const PREFIX = "MusicDiscovery" + ".";
 
+// Generic type parameter of this concept
 type User = ID;
-type MusicEntityID = ID;
 
-/**
- * a set of MusicEntities with
- *   an externalId String
- *   a type of TRACK or ALBUM or ARTIST
- *   a name String
- *   a uri String
- *   a imageUrl String
- *   a description String
- *   a releaseDate String
- *   a durationMs Number
- *   a artistName String
- */
-export interface MusicEntity {
-  _id: MusicEntityID;
-  externalId: string;
-  type: "track" | "album" | "artist";
+// Internal entity IDs for relationships and references
+type MusicItem = ID;
+type Track = ID;
+type Album = ID;
+type Artist = ID;
+
+// Unified interface for all music entities in the base 'MusicItems' collection
+interface MusicItemDoc {
+  _id: MusicItem;
+  externalId: string; // e.g., Spotify ID
   name: string;
-  uri: string;
-  imageUrl: string;
-  description: string;
-  releaseDate?: string;
-  durationMs?: number;
-  artistName?: string;
+  uri: string; // e.g., spotify:track:xxxx
+  imageUrl?: string; // URL for cover art or artist image
+  externalUrl?: string; // URL to Spotify web player
+  type: "track" | "album" | "artist"; // Discriminator
+  // Common fields
 }
 
-/**
- * a set of SearchResults with
- *   a User
- *   a MusicEntity
- */
-interface SearchResult {
-  _id: ID;
-  user: User;
-  entity: MusicEntityID;
+// Interfaces for subset collections, extending MusicItemDoc
+interface TrackDoc extends MusicItemDoc {
+  _id: Track;
+  type: "track";
+  durationMs: number;
+  albumId?: Album; // Internal ID link to Album
+  artistId?: Artist; // Internal ID link to primary Artist
 }
 
-/**
- * a set of Users with
- *   a lastQuery String
- */
-interface UserState {
-  _id: User;
-  lastQuery: string;
+interface AlbumDoc extends MusicItemDoc {
+  _id: Album;
+  type: "album";
+  releaseDate: string;
+  artistId?: Artist; // Internal ID link to primary Artist
+  totalTracks: number;
+}
+
+interface ArtistDoc extends MusicItemDoc {
+  _id: Artist;
+  type: "artist";
+  albums?: Album[]; // Internal ID links to Albums by this artist, representing "an Albums set of MusicItems"
+}
+
+// User-specific data managed by this concept
+interface MusicDiscoveryUserDoc {
+  _id: User; // The external User ID
+  searchResults: MusicItem[]; // Array of internal MusicItem IDs
 }
 
 /**
  * @concept MusicDiscovery [User]
- * @purpose Enable the exploration of a global music catalog and the preservation of search context.
+ * @purpose allow users to search for and retrieve specific music entities from a global catalog,
+ * creating a persistent local cache of discovered content.
+ * @principle a user can search for any kind of music item (track, album, artist), and the music
+ * information will be fetched from an external provider; this information will then be stored
+ * in a catalog; users may clear their search whenever they desire.
  */
 export default class MusicDiscoveryConcept {
-  entities: Collection<MusicEntity>;
-  searchResults: Collection<SearchResult>;
-  users: Collection<UserState>;
+  musicItems: Collection<MusicItemDoc>;
+  tracks: Collection<TrackDoc>;
+  albums: Collection<AlbumDoc>;
+  artists: Collection<ArtistDoc>;
+  users: Collection<MusicDiscoveryUserDoc>; // To store search results for users
 
   constructor(private readonly db: Db) {
-    this.entities = this.db.collection(PREFIX + "entities");
-    this.searchResults = this.db.collection(PREFIX + "searchResults");
+    this.musicItems = this.db.collection(PREFIX + "musicItems");
+    this.tracks = this.db.collection(PREFIX + "tracks");
+    this.albums = this.db.collection(PREFIX + "albums");
+    this.artists = this.db.collection(PREFIX + "artists");
     this.users = this.db.collection(PREFIX + "users");
   }
 
+  // --- Helper methods for data transformation and upsertion ---
+
   /**
-   * Helper to upsert a spotify item into our local MusicEntities state
+   * Transforms Spotify API track data into internal TrackDoc and upserts it.
+   * Also ensures associated album/artist are processed.
+   * @param spotifyTrack - Raw Spotify track object
+   * @returns The internal ID of the upserted track.
    */
-  private async upsertSpotifyItem(item: any, type: "track" | "album" | "artist"): Promise<MusicEntityID> {
-    const existing = await this.entities.findOne({ externalId: item.id });
+  private async _upsertTrack(spotifyTrack: any): Promise<Track> {
+    const existingTrack = await this.tracks.findOne({ externalId: spotifyTrack.id });
+    const trackId: Track = existingTrack ? existingTrack._id : freshID() as Track;
 
-    // Safely extract image
-    let imageUrl = "";
-    if (item.images && item.images.length > 0) imageUrl = item.images[0].url;
-    else if (item.album && item.album.images && item.album.images.length > 0) imageUrl = item.album.images[0].url;
-
-    // Safely extract artist name
-    let artistName = "";
-    if (item.artists && item.artists.length > 0) artistName = item.artists[0].name;
-
-    // Determine description based on type
-    let description = "";
-    if (type === 'artist') {
-      description = (item.genres || []).join(", ");
-    } else {
-      description = item.type;
+    let albumId: Album | undefined;
+    if (spotifyTrack.album) {
+      albumId = await this._upsertAlbum(spotifyTrack.album);
     }
 
-    if (existing) {
-      // update details if they exist in this payload
-      const updates: Partial<MusicEntity> = {};
-      if (imageUrl) updates.imageUrl = imageUrl;
-      if (item.release_date) updates.releaseDate = item.release_date;
-      // We don't overwrite description if it exists, as loadEntityDetails might have fetched a better one
-      
-      await this.entities.updateOne({ _id: existing._id }, { $set: updates });
-      return existing._id;
+    let artistId: Artist | undefined;
+    if (spotifyTrack.artists && spotifyTrack.artists.length > 0) {
+      artistId = await this._upsertArtist(spotifyTrack.artists[0]); // Primary artist
     }
 
-    const _id = freshID();
+    const trackDoc: TrackDoc = {
+      _id: trackId,
+      externalId: spotifyTrack.id,
+      name: spotifyTrack.name,
+      uri: spotifyTrack.uri,
+      imageUrl: spotifyTrack.album?.images?.[0]?.url,
+      externalUrl: spotifyTrack.external_urls?.spotify,
+      type: "track",
+      durationMs: spotifyTrack.duration_ms,
+      albumId: albumId,
+      artistId: artistId,
+    };
 
-    await this.entities.insertOne({
-      _id,
-      externalId: item.id,
-      type,
-      name: item.name,
-      uri: item.uri,
-      imageUrl,
-      description,
-      durationMs: item.duration_ms,
-      releaseDate: item.release_date,
-      artistName
-    });
+    await this.musicItems.updateOne({ _id: trackId }, { $set: trackDoc }, { upsert: true });
+    await this.tracks.updateOne({ _id: trackId }, { $set: trackDoc }, { upsert: true });
 
-    return _id;
+    return trackId;
   }
 
   /**
-   * search (user: User, query: String): (musicEntities: MusicEntity[])
-   * 
-   * **requires** query is not empty
-   * **effects** updates lastQuery of user, removes all SearchResults for user, fetches data from external service, creates/updates MusicEntities based on results, creates SearchResults linking user to the new entities
+   * Transforms Spotify API album data into internal AlbumDoc and upserts it.
+   * Also ensures associated artist is processed.
+   * @param spotifyAlbum - Raw Spotify album object
+   * @returns The internal ID of the upserted album.
    */
-  async search({ user, query }: { user: User; query: string }): Promise<{ musicEntities: MusicEntity[] } | { error: string }> {
-    if (!query) return { error: "Query cannot be empty" };
+  private async _upsertAlbum(spotifyAlbum: any): Promise<Album> {
+    const existingAlbum = await this.albums.findOne({ externalId: spotifyAlbum.id });
+    const albumId: Album = existingAlbum ? existingAlbum._id : freshID() as Album;
 
-    // Update User State
+    let artistId: Artist | undefined;
+    if (spotifyAlbum.artists && spotifyAlbum.artists.length > 0) {
+      artistId = await this._upsertArtist(spotifyAlbum.artists[0]); // Primary artist
+    }
+
+    const albumDoc: AlbumDoc = {
+      _id: albumId,
+      externalId: spotifyAlbum.id,
+      name: spotifyAlbum.name,
+      uri: spotifyAlbum.uri,
+      imageUrl: spotifyAlbum.images?.[0]?.url,
+      externalUrl: spotifyAlbum.external_urls?.spotify,
+      type: "album",
+      releaseDate: spotifyAlbum.release_date,
+      artistId: artistId,
+      totalTracks: spotifyAlbum.total_tracks,
+    };
+
+    await this.musicItems.updateOne({ _id: albumId }, { $set: albumDoc }, { upsert: true });
+    await this.albums.updateOne({ _id: albumId }, { $set: albumDoc }, { upsert: true });
+
+    return albumId;
+  }
+
+  /**
+   * Transforms Spotify API artist data into internal ArtistDoc and upserts it.
+   * @param spotifyArtist - Raw Spotify artist object
+   * @returns The internal ID of the upserted artist.
+   */
+  private async _upsertArtist(spotifyArtist: any): Promise<Artist> {
+    const existingArtist = await this.artists.findOne({ externalId: spotifyArtist.id });
+    const artistId: Artist = existingArtist ? existingArtist._id : freshID() as Artist;
+
+    const artistDoc: ArtistDoc = {
+      _id: artistId,
+      externalId: spotifyArtist.id,
+      name: spotifyArtist.name,
+      uri: spotifyArtist.uri,
+      imageUrl: spotifyArtist.images?.[0]?.url,
+      externalUrl: spotifyArtist.external_urls?.spotify,
+      type: "artist",
+      // albums will be populated by loadArtistAlbums action
+    };
+
+    await this.musicItems.updateOne({ _id: artistId }, { $set: artistDoc }, { upsert: true });
+    await this.artists.updateOne({ _id: artistId }, { $set: artistDoc }, { upsert: true });
+
+    return artistId;
+  }
+
+  /**
+   * Helper to retrieve a generic MusicItem by its internal ID.
+   */
+  private async _getMusicItemById(musicItemId: MusicItem): Promise<MusicItemDoc | null> {
+    return await this.musicItems.findOne({ _id: musicItemId });
+  }
+
+  // --- Actions ---
+
+  /**
+   * @action search (user: User, query: String, type: String): (items: MusicItem[])
+   * @requires `query` is not empty.
+   * @effects Fetches matches from provider. Upserts items into the `MusicItems` set
+   *          (and appropriate subsets based on type). Replaces `user`'s `searchResults`
+   *          with these items. Returns the items.
+   */
+  async search({ user, query, type }: { user: User; query: string; type: string }): Promise<{ items: MusicItemDoc[] } | { error: string }> {
+    if (!query) {
+      return { error: "Query cannot be empty." };
+    }
+
+    let spotifyResults: any;
+    try {
+      spotifyResults = await spotifyService.search({ query, type });
+    } catch (e: unknown) { // Explicitly type 'e' as unknown
+      return { error: `Failed to search Spotify: ${(e instanceof Error ? e.message : String(e))}` };
+    }
+
+    const upsertedItemIds: MusicItem[] = [];
+    const returnedItems: MusicItemDoc[] = [];
+
+    // Process tracks
+    if (spotifyResults.tracks?.items) {
+      for (const track of spotifyResults.tracks.items) {
+        const trackId = await this._upsertTrack(track);
+        const item = await this._getMusicItemById(trackId);
+        if (item) returnedItems.push(item);
+        upsertedItemIds.push(trackId);
+      }
+    }
+
+    // Process albums
+    if (spotifyResults.albums?.items) {
+      for (const album of spotifyResults.albums.items) {
+        const albumId = await this._upsertAlbum(album);
+        const item = await this._getMusicItemById(albumId);
+        if (item) returnedItems.push(item);
+        upsertedItemIds.push(albumId);
+      }
+    }
+
+    // Process artists
+    if (spotifyResults.artists?.items) {
+      for (const artist of spotifyResults.artists.items) {
+        const artistId = await this._upsertArtist(artist);
+        const item = await this._getMusicItemById(artistId);
+        if (item) returnedItems.push(item);
+        upsertedItemIds.push(artistId);
+      }
+    }
+
+    // Update user's search results
     await this.users.updateOne(
       { _id: user },
-      { $set: { lastQuery: query } },
-      { upsert: true }
+      { $set: { searchResults: upsertedItemIds } },
+      { upsert: true },
     );
 
-    let data;
-    try {
-      // Fetch from Spotify
-      data = await spotifyService.searchAll(query, 10);
-    } catch (e: any) {
-      return { error: `Spotify Error: ${e.message}` };
-    }
-
-    // Clear old results for this user
-    await this.searchResults.deleteMany({ user });
-
-    // Process and Store Entities
-    const resultIds: MusicEntityID[] = [];
-
-    if (data.tracks?.items) {
-      for (const item of data.tracks.items) {
-        resultIds.push(await this.upsertSpotifyItem(item, "track"));
-      }
-    }
-    if (data.albums?.items) {
-      for (const item of data.albums.items) {
-        resultIds.push(await this.upsertSpotifyItem(item, "album"));
-      }
-    }
-    if (data.artists?.items) {
-      for (const item of data.artists.items) {
-        resultIds.push(await this.upsertSpotifyItem(item, "artist"));
-      }
-    }
-
-    // Link to User
-    const resultDocs = resultIds.map(entityId => ({
-      _id: freshID(),
-      user,
-      entity: entityId
-    }));
-
-    if (resultDocs.length > 0) {
-      await this.searchResults.insertMany(resultDocs);
-    }
-    
-    // Return the entities found (Action return, not Query)
-    const entities = await this.entities.find({ _id: { $in: resultIds } }).toArray();
-    return { musicEntities: entities };
+    return { items: returnedItems };
   }
 
   /**
-   * clearSearch (user: User): ()
-   * 
-   * **effects** removes all SearchResults where owner is user
+   * @action clearSearch (user: User)
+   * @effects Removes all items from `user`'s `searchResults`.
    */
   async clearSearch({ user }: { user: User }): Promise<Empty> {
-    await this.searchResults.deleteMany({ user });
-    // Also optional: clear lastQuery from user state? Spec says "removes all SearchResults", doesn't explicitly say clear lastQuery string, but it makes sense.
-    // However, adhering strictly to "removes all SearchResults where owner is user"
+    await this.users.updateOne(
+      { _id: user },
+      { $set: { searchResults: [] } },
+      { upsert: true }, // Ensure user document exists if not already
+    );
     return {};
   }
 
   /**
-   * loadEntityDetails (externalId: String, type: String): (music: MusicEntity)
-   * 
-   * **requires** externalId is valid
-   * **effects** fetches detailed info from external service, updates the specific MusicEntity with richer data, and returns the corresponding MusicEntity
+   * @action loadTrack (externalId: String): (track: Track)
+   * @requires `externalId` is a valid track ID.
+   * @effects Fetches details. Upserts into `Tracks` subset. Returns the track.
    */
-  async loadEntityDetails({ externalId, type }: { externalId: string, type: string }): Promise<{ music: MusicEntity } | { error: string }> {
-    let musicEntityId: MusicEntityID;
-    
+  async loadTrack({ externalId }: { externalId: string }): Promise<{ track: TrackDoc } | { error: string }> {
     try {
-      let data;
-      if (type === 'track') data = await spotifyService.getTrack(externalId);
-      else if (type === 'album') data = await spotifyService.getAlbum(externalId);
-      else if (type === 'artist') data = await spotifyService.getArtist(externalId);
-      else return { error: "Invalid type. Must be track, album, or artist." };
+      const spotifyTrack = await spotifyService.getTrack(externalId);
+      const trackId = await this._upsertTrack(spotifyTrack);
+      const trackDoc = await this.tracks.findOne({ _id: trackId });
+      if (!trackDoc) return { error: "Track not found after upsert." }; // Should not happen
+      return { track: trackDoc };
+    } catch (e: unknown) { // Explicitly type 'e' as unknown
+      return { error: `Failed to load track ${externalId}: ${(e instanceof Error ? e.message : String(e))}` };
+    }
+  }
 
-      musicEntityId = await this.upsertSpotifyItem(data, type as "track" | "album" | "artist");
-    } catch (e: any) {
-      return { error: `Spotify Error: ${e.message}` };
+  /**
+   * @action loadAlbum (externalId: String): (album: Album)
+   * @requires `externalId` is a valid album ID.
+   * @effects Fetches details. Upserts into `Albums` subset. Returns the album.
+   */
+  async loadAlbum({ externalId }: { externalId: string }): Promise<{ album: AlbumDoc } | { error: string }> {
+    try {
+      const spotifyAlbum = await spotifyService.getAlbum(externalId);
+      const albumId = await this._upsertAlbum(spotifyAlbum);
+      const albumDoc = await this.albums.findOne({ _id: albumId });
+      if (!albumDoc) return { error: "Album not found after upsert." }; // Should not happen
+      return { album: albumDoc };
+    } catch (e: unknown) { // Explicitly type 'e' as unknown
+      return { error: `Failed to load album ${externalId}: ${(e instanceof Error ? e.message : String(e))}` };
+    }
+  }
+
+  /**
+   * @action loadArtist (externalId: String): (artist: Artist)
+   * @requires `externalId` is a valid artist ID.
+   * @effects Fetches details. Upserts into `Artists` subset. Returns the artist.
+   */
+  async loadArtist({ externalId }: { externalId: string }): Promise<{ artist: ArtistDoc } | { error: string }> {
+    try {
+      const spotifyArtist = await spotifyService.getArtist(externalId);
+      const artistId = await this._upsertArtist(spotifyArtist);
+      const artistDoc = await this.artists.findOne({ _id: artistId });
+      if (!artistDoc) return { error: "Artist not found after upsert." }; // Should not happen
+      return { artist: artistDoc };
+    } catch (e: unknown) { // Explicitly type 'e' as unknown
+      return { error: `Failed to load artist ${externalId}: ${(e instanceof Error ? e.message : String(e))}` };
+    }
+  }
+
+  /**
+   * @action loadAlbumTracks (albumId: String): (tracks: Track[])
+   * @requires `albumId` refers to a valid album.
+   * @effects Fetches tracks for the album. Upserts them into `Tracks` subset (linking them to the `albumId`).
+   *          Returns the tracks.
+   */
+  async loadAlbumTracks({ albumId }: { albumId: Album }): Promise<{ tracks: TrackDoc[] } | { error: string }> {
+    const albumDoc = await this.albums.findOne({ _id: albumId });
+    if (!albumDoc) {
+      return { error: `Album with internal ID ${albumId} not found.` };
     }
 
-    const music = await this.entities.findOne({ _id: musicEntityId });
-    if (!music) return { error: "Failed to load entity" };
-
-    return { music };
-  }
-
-  // --- QUERIES ---
-
-  /**
-   * _getSearchResults (user: User): (musicEntities: MusicEntity[])
-   * 
-   * **returns** the music entities tied to the search results that correspond to the given user
-   */
-  async _getSearchResults({ user }: { user: User }): Promise<{ musicEntity: MusicEntity }[]> {
-    const results = await this.searchResults.find({ user }).toArray();
-    const entityIds = results.map(r => r.entity);
-
-    // Single DB call
-    const entities = await this.entities.find({ _id: { $in: entityIds } }).toArray();
-
-    // Return as array of dictionaries with field matching the singular of the requested data,
-    // or typically we map to the object itself. 
-    // Following the pattern: return array of objects { musicEntity: ... }
-    return entities.map(e => ({ musicEntity: e }));
+    try {
+      const spotifyTracksResult = await spotifyService.getAlbumTracks(albumDoc.externalId);
+      const upsertedTracks: TrackDoc[] = [];
+      for (const spotifyTrack of spotifyTracksResult.items) {
+        // The Spotify API's getAlbumTracks returns simplified track objects.
+        // We might need to fetch full track details if more info is needed,
+        // but for now, we'll try to upsert with what's available or fetch full details if externalId is present.
+        const fullSpotifyTrack = await spotifyService.getTrack(spotifyTrack.id);
+        const trackId = await this._upsertTrack(fullSpotifyTrack);
+        const trackDoc = await this.tracks.findOne({ _id: trackId });
+        if (trackDoc) upsertedTracks.push(trackDoc);
+      }
+      return { tracks: upsertedTracks };
+    } catch (e: unknown) { // Explicitly type 'e' as unknown
+      return { error: `Failed to load tracks for album ${albumId}: ${(e instanceof Error ? e.message : String(e))}` };
+    }
   }
 
   /**
-   * _getEntityFromId (externalId: String): (musicEntity: MusicEntity)
-   * 
-   * **returns** the music entity with the given external id
+   * @action loadArtistAlbums (artistId: String): (albums: Album[])
+   * @requires `artistId` refers to a valid artist.
+   * @effects Fetches albums for the artist. Upserts them into `Albums` subset.
+   *          Updates the `ArtistDoc` with the associated albums. Returns the albums.
    */
-  async _getEntityFromId({ externalId }: { externalId: string }): Promise<{ musicEntity: MusicEntity }[]> {
-    const entity = await this.entities.findOne({ externalId });
-    if (!entity) return [];
-    return [{ musicEntity: entity }];
+  async loadArtistAlbums({ artistId }: { artistId: Artist }): Promise<{ albums: AlbumDoc[] } | { error: string }> {
+    const artistDoc = await this.artists.findOne({ _id: artistId });
+    if (!artistDoc) {
+      return { error: `Artist with internal ID ${artistId} not found.` };
+    }
+
+    try {
+      const spotifyAlbumsResult = await spotifyService.getArtistAlbums(artistDoc.externalId);
+      const upsertedAlbums: AlbumDoc[] = [];
+      const albumIds: Album[] = [];
+
+      for (const spotifyAlbum of spotifyAlbumsResult.items) {
+        const albumId = await this._upsertAlbum(spotifyAlbum);
+        const album = await this.albums.findOne({ _id: albumId });
+        if (album) {
+          upsertedAlbums.push(album);
+          albumIds.push(albumId);
+        }
+      }
+
+      // Update the artist's document with the albums found
+      await this.artists.updateOne(
+        { _id: artistId },
+        { $set: { albums: albumIds } },
+      );
+
+      return { albums: upsertedAlbums };
+    } catch (e: unknown) { // Explicitly type 'e' as unknown
+      return { error: `Failed to load albums for artist ${artistId}: ${(e instanceof Error ? e.message : String(e))}` };
+    }
+  }
+
+  // --- Queries ---
+
+  /**
+   * @query _getSearchResults (user: User): (items: MusicItem[])
+   * @effects Returns the set of `MusicItems` currently linked to the user.
+   */
+  async _getSearchResults({ user }: { user: User }): Promise<{ items: MusicItemDoc[] }> {
+    const userDoc = await this.users.findOne({ _id: user });
+    if (!userDoc || userDoc.searchResults.length === 0) {
+      return { items: [] };
+    }
+    const items = await this.musicItems.find({ _id: { $in: userDoc.searchResults } }).toArray();
+    return { items: items };
   }
 
   /**
-   * _getEntityFromUri (uri: String): (musicEntity: MusicEntity)
-   * 
-   * **returns** the music entity with the given external uri
+   * @query _getTrack (externalId: String): (track: Track)
+   * @requires Item exists in `Tracks` subset.
+   * @effects Returns the track.
    */
-  async _getEntityFromUri({ uri }: { uri: string }): Promise<{ musicEntity: MusicEntity }[]> {
-    const entity = await this.entities.findOne({ uri });
-    if (!entity) return [];
-    return [{ musicEntity: entity }];
+  async _getTrack({ externalId }: { externalId: string }): Promise<{ track: TrackDoc }[]> {
+    const track = await this.tracks.findOne({ externalId });
+    return track ? [{ track }] : [];
+  }
+
+  /**
+   * @query _getAlbum (externalId: String): (album: Album)
+   * @requires Item exists in `Albums` subset.
+   * @effects Returns the album.
+   */
+  async _getAlbum({ externalId }: { externalId: string }): Promise<{ album: AlbumDoc }[]> {
+    const album = await this.albums.findOne({ externalId });
+    return album ? [{ album }] : [];
+  }
+
+  /**
+   * @query _getArtist (externalId: String): (artist: Artist)
+   * @requires Item exists in `Artists` subset.
+   * @effects Returns the artist.
+   */
+  async _getArtist({ externalId }: { externalId: string }): Promise<{ artist: ArtistDoc }[]> {
+    const artist = await this.artists.findOne({ externalId });
+    return artist ? [{ artist }] : [];
+  }
+
+  /**
+   * @query _getTracksByAlbum (albumId: String): (tracks: Track[])
+   * @effects Returns all items in `Tracks` where the `albumId` matches.
+   */
+  async _getTracksByAlbum({ albumId }: { albumId: Album }): Promise<{ tracks: TrackDoc[] }> {
+    const tracks = await this.tracks.find({ albumId }).toArray();
+    return { tracks: tracks };
+  }
+
+  /**
+   * @query _getAlbumsByArtist (artistId: String): (albums: Album[])
+   * @effects Returns all items in `Albums` where the `artistId` matches.
+   */
+  async _getAlbumsByArtist({ artistId }: { artistId: Artist }): Promise<{ albums: AlbumDoc[] }> {
+    const albums = await this.albums.find({ artistId }).toArray();
+    return { albums: albums };
+  }
+
+  /**
+   * @query _getItem (externalId: String): (item: MusicItem)
+   * @effects Returns the generic `MusicItem` (useful if you don't know the type yet).
+   */
+  async _getItem({ externalId }: { externalId: string }): Promise<{ item: MusicItemDoc }[]> {
+    const item = await this.musicItems.findOne({ externalId });
+    return item ? [{ item }] : [];
+  }
+
+  /**
+   * @query _getEntityFromId (externalId: String): (musicEntity: MusicEntity)
+   * @effects Returns the `MusicEntity` with the given external id.
+   * Note: This query returns a union type, which TypeScript handles, but concept design
+   * generally expects a consistent return structure. For simplicity and to match
+   * the dictionary return format, we'll return an array of generic MusicItemDoc.
+   */
+  async _getEntityFromId({ externalId }: { externalId: string }): Promise<{ musicEntity: MusicItemDoc }[]> {
+    const item = await this.musicItems.findOne({ externalId });
+    return item ? [{ musicEntity: item }] : [];
+  }
+
+  /**
+   * @query _getEntityFromUri (uri: String): (musicEntity: MusicEntity)
+   * @effects Returns the `MusicEntity` with the given external uri.
+   */
+  async _getEntityFromUri({ uri }: { uri: string }): Promise<{ musicEntity: MusicItemDoc }[]> {
+    const item = await this.musicItems.findOne({ uri });
+    return item ? [{ musicEntity: item }] : [];
   }
 }
 ```

@@ -1,8 +1,16 @@
-import { assertEquals, assertExists, assertArrayIncludes } from "jsr:@std/assert";
+---
+timestamp: 'Mon Dec 01 2025 23:26:19 GMT-0500 (Eastern Standard Time)'
+parent: '[[../20251201_232619.345da438.md]]'
+content_id: bc1aca9278536f5860e8d3f8113d896b949706bd773fee9d201b1941ebbeba2e
+---
+
+# file: src/concepts/MusicDiscovery/MusicDiscoveryConcept.test.ts
+
+```typescript
+import { assertEquals, assertExists, assertNotEquals, assertArrayIncludes } from "jsr:@std/assert";
 import { testDb } from "@utils/database.ts";
 import { ID } from "@utils/types.ts";
 import MusicDiscoveryConcept from "./MusicDiscoveryConcept.ts";
-import { spotifyService } from "@utils/spotify.ts"; // Ensure spotifyService is imported
 
 // Assume these are external User IDs
 const userA = "user:Alice" as ID;
@@ -19,7 +27,7 @@ Deno.test.beforeEach(() => {
   Object.assign(spotifyService, originalSpotifyService);
 });
 
-Deno.test("Principle: User searches, items are cached, user clears search", async (t) => {
+Deno.test("Principle: User searches, items are cached, user clears search", async () => {
   const [db, client] = await testDb();
   const musicDiscovery = new MusicDiscoveryConcept(db);
 
@@ -97,48 +105,37 @@ Deno.test("Principle: User searches, items are cached, user clears search", asyn
       throw new Error("Artist not found in mock.");
     };
 
-    await t.step("User A searches for 'Imagine' (track)", async () => {
-      const searchResult = await musicDiscovery.search({ user: userA, query: "Imagine", type: "track" });
-      
-      if ("error" in searchResult) {
-        throw new Error(`Search unexpectedly failed: ${searchResult.error}`);
-      }
-      // TypeScript now knows `searchResult` is `{ items: MusicItemDoc[] }`
+    console.log("Trace: User A searches for 'Imagine' (track)");
+    const searchResult = await musicDiscovery.search({ user: userA, query: "Imagine", type: "track" });
+    assertNotEquals("error" in searchResult, true, "Search should not return an error.");
+    assertEquals(searchResult.items.length, 1, "Should find one track.");
+    const foundTrack = searchResult.items[0];
+    assertExists(foundTrack._id);
+    assertEquals(foundTrack.name, "Imagine");
+    assertEquals(foundTrack.externalId, "spotify-track-imagine");
 
-      assertEquals(searchResult.items.length, 1, "Should find one track.");
-      const foundTrack = searchResult.items[0];
-      assertExists(foundTrack._id);
-      assertEquals(foundTrack.name, "Imagine");
-      assertEquals(foundTrack.externalId, "spotify-track-imagine");
+    console.log("Verifying cached item in musicItems collection.");
+    const cachedItem = await musicDiscovery._getItem({ externalId: "spotify-track-imagine" });
+    assertEquals(cachedItem.length, 1, "Track should be cached in musicItems.");
+    assertEquals(cachedItem[0].item.name, "Imagine");
 
-      console.log("Verifying cached item in musicItems collection.");
-      const cachedItem = await musicDiscovery._getItem({ externalId: "spotify-track-imagine" });
-      assertEquals(cachedItem.length, 1, "Track should be cached in musicItems.");
-      assertEquals(cachedItem[0].item.name, "Imagine");
+    console.log("Verifying cached item in tracks subset collection.");
+    const cachedTrack = await musicDiscovery._getTrack({ externalId: "spotify-track-imagine" });
+    assertEquals(cachedTrack.length, 1, "Track should be cached in tracks subset.");
+    assertEquals(cachedTrack[0].track.name, "Imagine");
 
-      console.log("Verifying cached item in tracks subset collection.");
-      const cachedTrack = await musicDiscovery._getTrack({ externalId: "spotify-track-imagine" });
-      assertEquals(cachedTrack.length, 1, "Track should be cached in tracks subset.");
-      assertEquals(cachedTrack[0].track.name, "Imagine");
+    console.log("Verifying user A's search results.");
+    const userASearchResults = await musicDiscovery._getSearchResults({ user: userA });
+    assertEquals(userASearchResults.items.length, 1, "User A's search results should contain 1 item.");
+    assertEquals(userASearchResults.items[0].name, "Imagine");
 
-      console.log("Verifying user A's search results.");
-      const userASearchResults = await musicDiscovery._getSearchResults({ user: userA });
-      assertEquals(userASearchResults.items.length, 1, "User A's search results should contain 1 item.");
-      assertEquals(userASearchResults.items[0].name, "Imagine");
-    });
+    console.log("Trace: User A clears their search.");
+    const clearResult = await musicDiscovery.clearSearch({ user: userA });
+    assertEquals("error" in clearResult, false, "Clearing search should not return an error.");
 
-    await t.step("User A clears their search", async () => {
-      const clearResult = await musicDiscovery.clearSearch({ user: userA });
-      // clearResult is Promise<Empty | { error: string }>, but clearSearch should always succeed.
-      if ("error" in clearResult) {
-        throw new Error(`Clearing search unexpectedly failed: ${clearResult.error}`);
-      }
-      assertEquals("error" in clearResult, false, "Clearing search should not return an error.");
-
-      console.log("Verifying user A's search results are empty after clearing.");
-      const clearedSearchResults = await musicDiscovery._getSearchResults({ user: userA });
-      assertEquals(clearedSearchResults.items.length, 0, "User A's search results should be empty.");
-    });
+    console.log("Verifying user A's search results are empty after clearing.");
+    const clearedSearchResults = await musicDiscovery._getSearchResults({ user: userA });
+    assertEquals(clearedSearchResults.items.length, 0, "User A's search results should be empty.");
 
     console.log("--- Principle Test Finished ---");
   } finally {
@@ -160,12 +157,12 @@ Deno.test("Action: search handles empty query requirement", async () => {
   }
 });
 
-Deno.test("Action: search upserts various types and updates user results", async (t) => {
+Deno.test("Action: search upserts various types and updates user results", async () => {
   const [db, client] = await testDb();
   const musicDiscovery = new MusicDiscoveryConcept(db);
 
   try {
-    // Mock Spotify smartSearch response for mixed types
+    // Mock Spotify searchAll response for mixed types
     spotifyService.smartSearch = async (query: string) => {
       console.log(`Mocking Spotify smartSearch for query: '${query}'`);
       if (query === `"All My Life"`) {
@@ -208,48 +205,48 @@ Deno.test("Action: search upserts various types and updates user results", async
     };
 
     // Mock necessary get* calls for upserts
-    spotifyService.getTrack = async (id) => (id === "spotify-track-allmylife" ? { id, name: "All My Life", uri: "spotify:track:allmylife", duration_ms: 263000, album: { id: "spotify-album-allmylife", name: "All My Life", images: [{ url: "http://img.com/album.jpg" }] }, artists: [{ id: "spotify-artist-foofighters", name: "Foo Fighters" }] } : Promise.reject(new Error("Mock getTrack not found")));
+    spotifyService.getTrack = async (id) => {
+      if (id === "spotify-track-allmylife") return { id, name: "All My Life", uri: "spotify:track:allmylife", duration_ms: 263000, album: { id: "spotify-album-allmylife", name: "All My Life", images: [{ url: "http://img.com/album.jpg" }] }, artists: [{ id: "spotify-artist-foofighters", name: "Foo Fighters" }] };
+      throw new Error(`Mock getTrack not found: ${id}`);
+    };
     spotifyService.getAlbum = async (id) => {
       if (id === "spotify-album-allmylife") return { id, name: "All My Life", uri: "spotify:album:allmylife", release_date: "2002-10-22", total_tracks: 11, images: [{ url: "http://img.com/album.jpg" }], artists: [{ id: "spotify-artist-foofighters", name: "Foo Fighters" }] };
       if (id === "spotify-album-thecolourandtheshape") return { id, name: "The Colour And The Shape", uri: "spotify:album:thecolourandtheshape", release_date: "1997-05-20", total_tracks: 13, images: [{ url: "http://img.com/album_color.jpg" }], artists: [{ id: "spotify-artist-foofighters", name: "Foo Fighters" }] };
       throw new Error(`Mock getAlbum not found: ${id}`);
     };
-    spotifyService.getArtist = async (id) => (id === "spotify-artist-foofighters" ? { id, name: "Foo Fighters", uri: "spotify:artist:foofighters", images: [{ url: "http://img.com/foofighters.jpg" }] } : Promise.reject(new Error("Mock getArtist not found")));
+    spotifyService.getArtist = async (id) => {
+      if (id === "spotify-artist-foofighters") return { id, name: "Foo Fighters", uri: "spotify:artist:foofighters", images: [{ url: "http://img.com/foofighters.jpg" }] };
+      throw new Error(`Mock getArtist not found: ${id}`);
+    };
 
-    await t.step("User B searches for 'All My Life' across all types", async () => {
-      const searchResult = await musicDiscovery.search({ user: userB, query: "All My Life", type: "track,album,artist" });
-      
-      if ("error" in searchResult) {
-        throw new Error(`Search unexpectedly failed: ${searchResult.error}`);
-      }
-      // TypeScript now knows `searchResult` is `{ items: MusicItemDoc[] }`
+    console.log("Trace: User B searches for 'All My Life' across all types.");
+    const searchResult = await musicDiscovery.search({ user: userB, query: "All My Life", type: "track,album,artist" });
+    assertNotEquals("error" in searchResult, true, "Search should not return an error.");
+    assertEquals(searchResult.items.length, 3, "Should find one track, one album, one artist.");
 
-      assertEquals(searchResult.items.length, 3, "Should find one track, one album, one artist.");
+    // Verify types
+    assertExists(searchResult.items.find(item => item.name === "All My Life" && item.type === "track"));
+    assertExists(searchResult.items.find(item => item.name === "The Colour And The Shape" && item.type === "album"));
+    assertExists(searchResult.items.find(item => item.name === "Foo Fighters" && item.type === "artist"));
 
-      // Verify types
-      assertExists(searchResult.items.find(item => item.name === "All My Life" && item.type === "track"));
-      assertExists(searchResult.items.find(item => item.name === "The Colour And The Shape" && item.type === "album"));
-      assertExists(searchResult.items.find(item => item.name === "Foo Fighters" && item.type === "artist"));
+    // Verify cached items
+    const cachedTrack = await musicDiscovery._getTrack({ externalId: "spotify-track-allmylife" });
+    assertEquals(cachedTrack.length, 1);
+    const cachedAlbum = await musicDiscovery._getAlbum({ externalId: "spotify-album-thecolourandtheshape" });
+    assertEquals(cachedAlbum.length, 1);
+    const cachedArtist = await musicDiscovery._getArtist({ externalId: "spotify-artist-foofighters" });
+    assertEquals(cachedArtist.length, 1);
 
-      // Verify cached items
-      const cachedTrack = await musicDiscovery._getTrack({ externalId: "spotify-track-allmylife" });
-      assertEquals(cachedTrack.length, 1);
-      const cachedAlbum = await musicDiscovery._getAlbum({ externalId: "spotify-album-thecolourandtheshape" });
-      assertEquals(cachedAlbum.length, 1);
-      const cachedArtist = await musicDiscovery._getArtist({ externalId: "spotify-artist-foofighters" });
-      assertEquals(cachedArtist.length, 1);
-
-      // Verify user's search results
-      const userBSearchResults = await musicDiscovery._getSearchResults({ user: userB });
-      assertEquals(userBSearchResults.items.length, 3, "User B's search results should contain 3 items.");
-      assertArrayIncludes(userBSearchResults.items.map(i => i.name), ["All My Life", "The Colour And The Shape", "Foo Fighters"]);
-    });
+    // Verify user's search results
+    const userBSearchResults = await musicDiscovery._getSearchResults({ user: userB });
+    assertEquals(userBSearchResults.items.length, 3, "User B's search results should contain 3 items.");
+    assertArrayIncludes(userBSearchResults.items.map(i => i.name), ["All My Life", "The Colour And The Shape", "Foo Fighters"]);
   } finally {
     await client.close();
   }
 });
 
-Deno.test("Action: loadTrack loads and caches a specific track", async (t) => {
+Deno.test("Action: loadTrack loads and caches a specific track", async () => {
   const [db, client] = await testDb();
   const musicDiscovery = new MusicDiscoveryConcept(db);
 
@@ -280,40 +277,34 @@ Deno.test("Action: loadTrack loads and caches a specific track", async (t) => {
       throw new Error(`Mock getArtist not found: ${id}`);
     };
 
-    await t.step("Loading a specific track 'Bohemian Rhapsody'", async () => {
-      const result = await musicDiscovery.loadTrack({ externalId: "specific-track-id" });
-      
-      if ("error" in result) {
-        throw new Error(`Loading track unexpectedly failed: ${result.error}`);
-      }
-      // TypeScript now knows `result` is `{ track: TrackDoc }`
-      const { track } = result; // No need for `as { track: ... }` cast
+    console.log("Trace: Loading a specific track 'Bohemian Rhapsody'.");
+    const result = await musicDiscovery.loadTrack({ externalId: "specific-track-id" });
+    assertNotEquals("error" in result, true, "Loading track should not fail.");
+    const { track } = result as { track: MusicDiscoveryConcept['tracks']['_interface'] };
+    assertEquals(track.name, "Bohemian Rhapsody");
+    assertEquals(track.type, "track");
+    assertExists(track._id);
 
-      assertEquals(track.name, "Bohemian Rhapsody");
-      assertEquals(track.type, "track");
-      assertExists(track._id);
+    console.log("Verifying track is cached by external ID.");
+    const cached = await musicDiscovery._getTrack({ externalId: "specific-track-id" });
+    assertEquals(cached.length, 1);
+    assertEquals(cached[0].track.name, "Bohemian Rhapsody");
 
-      console.log("Verifying track is cached by external ID.");
-      const cached = await musicDiscovery._getTrack({ externalId: "specific-track-id" });
-      assertEquals(cached.length, 1);
-      assertEquals(cached[0].track.name, "Bohemian Rhapsody");
-    });
-
-    await t.step("Attempting to load a non-existent track", async () => {
-      const errorResult = await musicDiscovery.loadTrack({ externalId: "non-existent-track" });
-      assertEquals("error" in errorResult, true, "Loading non-existent track should fail.");
-    });
+    console.log("Trace: Attempting to load a non-existent track.");
+    const errorResult = await musicDiscovery.loadTrack({ externalId: "non-existent-track" });
+    assertEquals("error" in errorResult, true, "Loading non-existent track should fail.");
   } finally {
     await client.close();
   }
 });
 
 
-Deno.test("Action: loadAlbumTracks loads and links tracks to an album", async (t) => {
+Deno.test("Action: loadAlbumTracks loads and links tracks to an album", async () => {
   const [db, client] = await testDb();
   const musicDiscovery = new MusicDiscoveryConcept(db);
 
   try {
+    // 1. Load an album first to get an internal albumId
     const albumExternalId = "album-darksideofmoon";
     const artistExternalId = "artist-pinkfloyd";
 
@@ -326,18 +317,12 @@ Deno.test("Action: loadAlbumTracks loads and links tracks to an album", async (t
       throw new Error(`Mock getArtist not found: ${id}`);
     };
 
-    // Perform the initial album loading directly in the main test scope
+    console.log("Trace: Loading album 'Dark Side of the Moon'.");
     const loadAlbumResult = await musicDiscovery.loadAlbum({ externalId: albumExternalId });
-    if ("error" in loadAlbumResult) {
-      throw new Error(`Loading album unexpectedly failed: ${loadAlbumResult.error}`);
-    }
-    const { album: loadedAlbum } = loadAlbumResult;
-    const internalAlbumId = loadedAlbum._id; // internalAlbumId is now guaranteed to be assigned here
-
-    await t.step("Loading album 'Dark Side of the Moon' (setup)", async () => {
-      assertExists(internalAlbumId); // Confirm setup
-      assertEquals(loadedAlbum.name, "Dark Side of the Moon");
-    });
+    assertNotEquals("error" in loadAlbumResult, true, "Loading album should not fail.");
+    const { album: loadedAlbum } = loadAlbumResult as { album: MusicDiscoveryConcept['albums']['_interface'] };
+    const internalAlbumId = loadedAlbum._id;
+    assertExists(internalAlbumId);
 
     // 2. Mock getAlbumTracks and getTrack for individual tracks
     spotifyService.getAlbumTracks = async (albumId: string) => {
@@ -360,31 +345,29 @@ Deno.test("Action: loadAlbumTracks loads and links tracks to an album", async (t
       throw new Error(`Mock getTrack not found: ${id}`);
     };
 
-    await t.step(`Loading tracks for album (internal ID: ${internalAlbumId})`, async () => {
-      const loadTracksResult = await musicDiscovery.loadAlbumTracks({ albumId: internalAlbumId });
-      if ("error" in loadTracksResult) {
-        throw new Error(`Loading album tracks unexpectedly failed: ${loadTracksResult.error}`);
-      }
-      const { tracks: albumTracks } = loadTracksResult;
-      assertEquals(albumTracks.length, 2, "Should load 2 tracks.");
-      assertExists(albumTracks.find(t => t.name === "Speak to Me"));
-      assertExists(albumTracks.find(t => t.name === "Breathe (In the Air)"));
+    console.log(`Trace: Loading tracks for album (internal ID: ${internalAlbumId}).`);
+    const loadTracksResult = await musicDiscovery.loadAlbumTracks({ albumId: internalAlbumId });
+    assertNotEquals("error" in loadTracksResult, true, "Loading album tracks should not fail.");
+    const { tracks: albumTracks } = loadTracksResult as { tracks: MusicDiscoveryConcept['tracks']['_interface'][] };
+    assertEquals(albumTracks.length, 2, "Should load 2 tracks.");
+    assertExists(albumTracks.find(t => t.name === "Speak to Me"));
+    assertExists(albumTracks.find(t => t.name === "Breathe (In the Air)"));
 
-      console.log("Verifying tracks are linked to the album via query.");
-      const queriedTracks = await musicDiscovery._getTracksByAlbum({ albumId: internalAlbumId });
-      assertEquals(queriedTracks.tracks.length, 2);
-      assertExists(queriedTracks.tracks.find(t => t.name === "Speak to Me" && t.albumId === internalAlbumId));
-    });
+    console.log("Verifying tracks are linked to the album via query.");
+    const queriedTracks = await musicDiscovery._getTracksByAlbum({ albumId: internalAlbumId });
+    assertEquals(queriedTracks.tracks.length, 2);
+    assertExists(queriedTracks.tracks.find(t => t.name === "Speak to Me" && t.albumId === internalAlbumId));
   } finally {
     await client.close();
   }
 });
 
-Deno.test("Action: loadArtistAlbums loads and links albums to an artist", async (t) => {
+Deno.test("Action: loadArtistAlbums loads and links albums to an artist", async () => {
   const [db, client] = await testDb();
   const musicDiscovery = new MusicDiscoveryConcept(db);
 
   try {
+    // 1. Load an artist first to get an internal artistId
     const artistExternalId = "artist-taylorswift";
     spotifyService.getArtist = async (id) => {
       if (id === artistExternalId) return { id, name: "Taylor Swift", uri: "spotify:artist:taylorswift", images: [{ url: "http://img.com/taylor.jpg" }] };
@@ -396,18 +379,12 @@ Deno.test("Action: loadArtistAlbums loads and links albums to an artist", async 
       throw new Error(`Mock getAlbum not found: ${id}`);
     };
 
-    // Perform the initial artist loading directly in the main test scope
+    console.log("Trace: Loading artist 'Taylor Swift'.");
     const loadArtistResult = await musicDiscovery.loadArtist({ externalId: artistExternalId });
-    if ("error" in loadArtistResult) {
-      throw new Error(`Loading artist unexpectedly failed: ${loadArtistResult.error}`);
-    }
-    const { artist: loadedArtist } = loadArtistResult;
-    const internalArtistId = loadedArtist._id; // internalArtistId is now guaranteed to be assigned here
-
-    await t.step("Loading artist 'Taylor Swift' (setup)", async () => {
-      assertExists(internalArtistId); // Confirm setup
-      assertEquals(loadedArtist.name, "Taylor Swift");
-    });
+    assertNotEquals("error" in loadArtistResult, true, "Loading artist should not fail.");
+    const { artist: loadedArtist } = loadArtistResult as { artist: MusicDiscoveryConcept['artists']['_interface'] };
+    const internalArtistId = loadedArtist._id;
+    assertExists(internalArtistId);
 
     // 2. Mock getArtistAlbums
     spotifyService.getArtistAlbums = async (artistId: string) => {
@@ -423,33 +400,30 @@ Deno.test("Action: loadArtistAlbums loads and links albums to an artist", async 
       return { items: [] };
     };
 
-    await t.step(`Loading albums for artist (internal ID: ${internalArtistId})`, async () => {
-      const loadAlbumsResult = await musicDiscovery.loadArtistAlbums({ artistId: internalArtistId });
-      if ("error" in loadAlbumsResult) {
-        throw new Error(`Loading artist albums unexpectedly failed: ${loadAlbumsResult.error}`);
-      }
-      const { albums: artistAlbums } = loadAlbumsResult;
-      assertEquals(artistAlbums.length, 2, "Should load 2 albums.");
-      assertExists(artistAlbums.find(a => a.name === "Fearless"));
-      assertExists(artistAlbums.find(a => a.name === "Red"));
+    console.log(`Trace: Loading albums for artist (internal ID: ${internalArtistId}).`);
+    const loadAlbumsResult = await musicDiscovery.loadArtistAlbums({ artistId: internalArtistId });
+    assertNotEquals("error" in loadAlbumsResult, true, "Loading artist albums should not fail.");
+    const { albums: artistAlbums } = loadAlbumsResult as { albums: MusicDiscoveryConcept['albums']['_interface'][] };
+    assertEquals(artistAlbums.length, 2, "Should load 2 albums.");
+    assertExists(artistAlbums.find(a => a.name === "Fearless"));
+    assertExists(artistAlbums.find(a => a.name === "Red"));
 
-      console.log("Verifying albums are linked to the artist via query.");
-      const queriedAlbums = await musicDiscovery._getAlbumsByArtist({ artistId: internalArtistId });
-      assertEquals(queriedAlbums.albums.length, 2);
-      assertExists(queriedAlbums.albums.find(a => a.name === "Fearless" && a.artistId === internalArtistId));
+    console.log("Verifying albums are linked to the artist via query.");
+    const queriedAlbums = await musicDiscovery._getAlbumsByArtist({ artistId: internalArtistId });
+    assertEquals(queriedAlbums.albums.length, 2);
+    assertExists(queriedAlbums.albums.find(a => a.name === "Fearless" && a.artistId === internalArtistId));
 
-      console.log("Verifying the artist's document has the album IDs stored.");
-      const updatedArtist = await musicDiscovery.artists.findOne({ _id: internalArtistId });
-      assertExists(updatedArtist?.albums);
-      assertEquals(updatedArtist.albums.length, 2);
-      assertArrayIncludes(updatedArtist.albums.map(String), artistAlbums.map(a => a._id.toString()));
-    });
+    console.log("Verifying the artist's document has the album IDs stored.");
+    const updatedArtist = await musicDiscovery.artists.findOne({ _id: internalArtistId });
+    assertExists(updatedArtist?.albums);
+    assertEquals(updatedArtist.albums.length, 2);
+    assertArrayIncludes(updatedArtist.albums.map(String), artistAlbums.map(a => a._id.toString()));
   } finally {
     await client.close();
   }
 });
 
-Deno.test("Queries: _getEntityFromId and _getEntityFromUri work correctly", async (t) => {
+Deno.test("Queries: _getEntityFromId and _getEntityFromUri work correctly", async () => {
   const [db, client] = await testDb();
   const musicDiscovery = new MusicDiscoveryConcept(db);
 
@@ -471,44 +445,36 @@ Deno.test("Queries: _getEntityFromId and _getEntityFromUri work correctly", asyn
       artists: { items: [] },
     });
     // Mock getTrack, getAlbum, getArtist as needed by upsert helpers
-    spotifyService.getTrack = async (id) => (id === "track-123" ? { id, name: "Sample Track", uri: "spotify:track:123", duration_ms: 100000, album: { id: "album-456", name: "Sample Album", images: [] }, artists: [{ id: "artist-789", name: "Sample Artist" }] } : Promise.reject(new Error("Not found")));
-    spotifyService.getAlbum = async (id) => (id === "album-456" ? { id, name: "Sample Album", uri: "spotify:album:456", release_date: "2023-01-01", total_tracks: 1, images: [], artists: [{ id: "artist-789", name: "Sample Artist" }] } : Promise.reject(new Error("Not found")));
-    spotifyService.getArtist = async (id) => (id === "artist-789" ? { id, name: "Sample Artist", uri: "spotify:artist:789", images: [] } : Promise.reject(new Error("Not found")));
+    spotifyService.getTrack = async (id) => (id === "track-123" ? { id, name: "Sample Track", uri: "spotify:track:123", duration_ms: 100000, album: { id: "album-456", name: "Sample Album", images: [] }, artists: [{ id: "artist-789", name: "Sample Artist" }] } : Promise.reject("Not found"));
+    spotifyService.getAlbum = async (id) => (id === "album-456" ? { id, name: "Sample Album", uri: "spotify:album:456", release_date: "2023-01-01", total_tracks: 1, images: [], artists: [{ id: "artist-789", name: "Sample Artist" }] } : Promise.reject("Not found"));
+    spotifyService.getArtist = async (id) => (id === "artist-789" ? { id, name: "Sample Artist", uri: "spotify:artist:789", images: [] } : Promise.reject("Not found"));
 
 
-    await t.step("Adding a sample track via search to populate state", async () => {
-      const searchResult = await musicDiscovery.search({ user: userA, query: "Sample", type: "track" });
-      if ("error" in searchResult) {
-        throw new Error(`Search unexpectedly failed: ${searchResult.error}`);
-      }
-      assertEquals(searchResult.items.length, 1, "Should have added one item to state.");
-    });
+    console.log("Trace: Adding a sample track via search to populate state.");
+    await musicDiscovery.search({ user: userA, query: "Sample", type: "track" });
 
-    await t.step("Query: _getEntityFromId with existing external ID", async () => {
-      const entityById = await musicDiscovery._getEntityFromId({ externalId: "track-123" });
-      assertEquals(entityById.length, 1);
-      assertEquals(entityById[0].musicEntity.name, "Sample Track");
-      assertEquals(entityById[0].musicEntity.type, "track");
-    });
+    console.log("Query: _getEntityFromId with existing external ID.");
+    const entityById = await musicDiscovery._getEntityFromId({ externalId: "track-123" });
+    assertEquals(entityById.length, 1);
+    assertEquals(entityById[0].musicEntity.name, "Sample Track");
+    assertEquals(entityById[0].musicEntity.type, "track");
 
-    await t.step("Query: _getEntityFromUri with existing URI", async () => {
-      const entityByUri = await musicDiscovery._getEntityFromUri({ uri: "spotify:track:123" });
-      assertEquals(entityByUri.length, 1);
-      assertEquals(entityByUri[0].musicEntity.name, "Sample Track");
-      assertEquals(entityByUri[0].musicEntity.type, "track");
-    });
+    console.log("Query: _getEntityFromUri with existing URI.");
+    const entityByUri = await musicDiscovery._getEntityFromUri({ uri: "spotify:track:123" });
+    assertEquals(entityByUri.length, 1);
+    assertEquals(entityByUri[0].musicEntity.name, "Sample Track");
+    assertEquals(entityByUri[0].musicEntity.type, "track");
 
-    await t.step("Query: _getEntityFromId with non-existent external ID", async () => {
-      const nonExistentById = await musicDiscovery._getEntityFromId({ externalId: "non-existent-id" });
-      assertEquals(nonExistentById.length, 0);
-    });
+    console.log("Query: _getEntityFromId with non-existent external ID.");
+    const nonExistentById = await musicDiscovery._getEntityFromId({ externalId: "non-existent-id" });
+    assertEquals(nonExistentById.length, 0);
 
-    await t.step("Query: _getEntityFromUri with non-existent URI", async () => {
-      const nonExistentByUri = await musicDiscovery._getEntityFromUri({ uri: "spotify:track:nonexistent" });
-      assertEquals(nonExistentByUri.length, 0);
-    });
+    console.log("Query: _getEntityFromUri with non-existent URI.");
+    const nonExistentByUri = await musicDiscovery._getEntityFromUri({ uri: "spotify:track:nonexistent" });
+    assertEquals(nonExistentByUri.length, 0);
 
   } finally {
     await client.close();
   }
 });
+```

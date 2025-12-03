@@ -1,3 +1,359 @@
+---
+timestamp: 'Mon Dec 01 2025 23:15:16 GMT-0500 (Eastern Standard Time)'
+parent: '[[../20251201_231516.0f67453e.md]]'
+content_id: 43bde3413642734ab09a1c3e9799a68eb2f20e69cfdb1cf377d80eb4f77333e1
+---
+
+# response:
+
+To implement the `MusicDiscovery` concept, we first need to ensure the `SpotifyService` can fetch an artist's albums. I've added a `getArtistAlbums` method to the provided `src/utils/spotify.ts` file.
+
+Then, we'll implement the `MusicDiscoveryConcept` class in `src/concepts/MusicDiscovery/MusicDiscoveryConcept.ts`, following the specified structure for state, actions, and queries.
+
+### 1. Update `src/utils/spotify.ts`
+
+Add the `getArtistAlbums` method to the `SpotifyService` class:
+
+```typescript
+import "jsr:@std/dotenv/load";
+
+const CLIENT_ID = Deno.env.get("CLIENT_ID");
+const CLIENT_SECRET = Deno.env.get("CLIENT_SECRET");
+
+if (!CLIENT_ID || !CLIENT_SECRET) {
+  throw new Error("CLIENT_ID and CLIENT_SECRET must be set in environment variables");
+}
+
+interface SpotifyTokenResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+}
+
+interface SpotifySearchParams {
+  query: string;
+  type?: "track" | "album" | "artist" | "playlist" | string; // string allows comma-separated types like "track,album,artist"
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * Spotify API Service
+ * Handles authentication and API calls to Spotify Web API
+ */
+export class SpotifyService {
+  private accessToken: string | null = null;
+  private tokenExpiry: number = 0;
+
+  /**
+   * Get or refresh access token
+   */
+  private async getAccessToken(): Promise<string> {
+    // Return cached token if still valid (with 5 minute buffer)
+    if (this.accessToken && Date.now() < this.tokenExpiry - 300000) {
+      return this.accessToken;
+    }
+
+    const authString = btoa(`${CLIENT_ID}:${CLIENT_SECRET}`);
+
+    const response = await fetch("https://accounts.spotify.com/api/token", {
+      method: "POST",
+      body: new URLSearchParams({
+        grant_type: "client_credentials",
+      }),
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Authorization": "Basic " + authString,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get Spotify access token: ${response.statusText}`);
+    }
+
+    const data: SpotifyTokenResponse = await response.json();
+    this.accessToken = data.access_token;
+    this.tokenExpiry = Date.now() + data.expires_in * 1000;
+
+    return this.accessToken;
+  }
+
+  /**
+   * Search for tracks, albums, artists, or playlists
+   */
+  async search(params: SpotifySearchParams) {
+    const accessToken = await this.getAccessToken();
+    const type = params.type || "track";
+    const limit = params.limit || 20;
+    const offset = params.offset || 0;
+
+    const url = new URL("https://api.spotify.com/v1/search");
+    url.searchParams.set("q", params.query);
+    url.searchParams.set("type", type);
+    url.searchParams.set("limit", limit.toString());
+    url.searchParams.set("offset", offset.toString());
+
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Spotify API error: ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Search for tracks (convenience method)
+   */
+  async searchTracks(query: string, limit: number = 20, offset: number = 0) {
+    return await this.search({ query, type: "track", limit, offset });
+  }
+
+  /**
+   * Search for a specific track by name and optionally artist
+   * Uses Spotify's query syntax for more precise results
+   * @example searchTrackByName("Need You Now", "Lady A")
+   */
+  async searchTrackByName(
+    trackName: string,
+    artistName?: string,
+    limit: number = 20,
+    offset: number = 0,
+  ) {
+    let query = `track:${trackName}`;
+    if (artistName) {
+      query += ` artist:${artistName}`;
+    }
+    return await this.search({ query, type: "track", limit, offset });
+  }
+
+  /**
+   * Search for albums (convenience method)
+   */
+  async searchAlbums(query: string, limit: number = 20, offset: number = 0) {
+    return await this.search({ query, type: "album", limit, offset });
+  }
+
+  /**
+   * Search for artists (convenience method)
+   */
+  async searchArtists(query: string, limit: number = 20, offset: number = 0) {
+    return await this.search({ query, type: "artist", limit, offset });
+  }
+
+  /**
+   * Search across all types (tracks, albums, artists) simultaneously
+   * Perfect for when you don't know what type of music the user is searching for
+   * Uses quoted query for better exact phrase matching
+   */
+  async searchAll(
+    query: string,
+    limit: number = 20,
+    offset: number = 0,
+  ) {
+    // Use quoted query for exact phrase matching, which improves relevance
+    // This helps when users search for exact song/album/artist names
+    const quotedQuery = query.includes('"') ? query : `"${query}"`;
+    
+    return await this.search({
+      query: quotedQuery,
+      type: "track,album,artist",
+      limit,
+      offset,
+    });
+  }
+
+  /**
+   * Smart search that tries multiple strategies for best results
+   * 1. First tries exact phrase match (quoted)
+   * 2. Falls back to general search if needed
+   * Returns results from the most relevant search
+   */
+  async smartSearch(
+    query: string,
+    limit: number = 20,
+    offset: number = 0,
+  ) {
+    // Strategy 1: Try exact phrase match first (best for specific names)
+    const exactResults = await this.search({
+      query: `"${query}"`,
+      type: "track,album,artist",
+      limit,
+      offset,
+    });
+
+    // If we got good results (check if first result is highly relevant), return them
+    // Otherwise, try a general search
+    const hasGoodResults = 
+      (exactResults.tracks?.items?.length > 0 && exactResults.tracks.items[0].name.toLowerCase().includes(query.toLowerCase().replace(/"/g, ''))) ||
+      (exactResults.albums?.items?.length > 0 && exactResults.albums.items[0].name.toLowerCase().includes(query.toLowerCase().replace(/"/g, ''))) ||
+      (exactResults.artists?.items?.length > 0 && exactResults.artists.items[0].name.toLowerCase().includes(query.toLowerCase().replace(/"/g, '')));
+
+    if (hasGoodResults) {
+      return exactResults;
+    }
+
+    // Strategy 2: Try general search (better for partial matches, trending content)
+    return await this.search({
+      query,
+      type: "track,album,artist",
+      limit,
+      offset,
+    });
+  }
+
+  /**
+   * Get track information by ID
+   */
+  async getTrack(trackId: string) {
+    const accessToken = await this.getAccessToken();
+
+    const response = await fetch(
+      `https://api.spotify.com/v1/tracks/${trackId}`,
+      {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+        },
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(`Spotify API error: ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Get album information by ID
+   */
+  async getAlbum(albumId: string) {
+    const accessToken = await this.getAccessToken();
+
+    const response = await fetch(
+      `https://api.spotify.com/v1/albums/${albumId}`,
+      {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+        },
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(`Spotify API error: ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Get artist information by ID
+   */
+  async getArtist(artistId: string) {
+    const accessToken = await this.getAccessToken();
+
+    const response = await fetch(
+      `https://api.spotify.com/v1/artists/${artistId}`,
+      {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+        },
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(`Spotify API error: ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Get album tracks by album ID
+   * @see https://developer.spotify.com/documentation/web-api/reference/get-an-albums-tracks
+   */
+  async getAlbumTracks(
+    albumId: string,
+    options?: { market?: string; limit?: number; offset?: number },
+  ) {
+    const accessToken = await this.getAccessToken();
+    const limit = options?.limit || 20;
+    const offset = options?.offset || 0;
+
+    const url = new URL(`https://api.spotify.com/v1/albums/${albumId}/tracks`);
+    if (options?.market) {
+      url.searchParams.set("market", options.market);
+    }
+    url.searchParams.set("limit", limit.toString());
+    url.searchParams.set("offset", offset.toString());
+
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Spotify API error: ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Get an artist's albums
+   * @see https://developer.spotify.com/documentation/web-api/reference/get-an-artists-albums
+   */
+  async getArtistAlbums(
+    artistId: string,
+    options?: { include_groups?: string; market?: string; limit?: number; offset?: number },
+  ) {
+    const accessToken = await this.getAccessToken();
+    const limit = options?.limit || 20;
+    const offset = options?.offset || 0;
+    const includeGroups = options?.include_groups || "album,single,compilation,appears_on";
+
+    const url = new URL(`https://api.spotify.com/v1/artists/${artistId}/albums`);
+    url.searchParams.set("include_groups", includeGroups);
+    if (options?.market) {
+      url.searchParams.set("market", options.market);
+    }
+    url.searchParams.set("limit", limit.toString());
+    url.searchParams.set("offset", offset.toString());
+
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Spotify API error: ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+}
+
+// Export a singleton instance
+export const spotifyService = new SpotifyService();
+
+// Example Spotify Service Calls - removed for cleaner response, assumed to be in the original file.
+```
+
+### 2. Implement `src/concepts/MusicDiscovery/MusicDiscoveryConcept.ts`
+
+```typescript
 import { Collection, Db } from "npm:mongodb";
 import { Empty, ID } from "@utils/types.ts";
 import { freshID } from "@utils/database.ts";
@@ -204,8 +560,8 @@ export default class MusicDiscoveryConcept {
     let spotifyResults: any;
     try {
       spotifyResults = await spotifyService.search({ query, type });
-    } catch (e: unknown) { // Explicitly type 'e' as unknown
-      return { error: `Failed to search Spotify: ${(e instanceof Error ? e.message : String(e))}` };
+    } catch (e) {
+      return { error: `Failed to search Spotify: ${e.message}` };
     }
 
     const upsertedItemIds: MusicItem[] = [];
@@ -276,8 +632,8 @@ export default class MusicDiscoveryConcept {
       const trackDoc = await this.tracks.findOne({ _id: trackId });
       if (!trackDoc) return { error: "Track not found after upsert." }; // Should not happen
       return { track: trackDoc };
-    } catch (e: unknown) { // Explicitly type 'e' as unknown
-      return { error: `Failed to load track ${externalId}: ${(e instanceof Error ? e.message : String(e))}` };
+    } catch (e) {
+      return { error: `Failed to load track ${externalId}: ${e.message}` };
     }
   }
 
@@ -293,8 +649,8 @@ export default class MusicDiscoveryConcept {
       const albumDoc = await this.albums.findOne({ _id: albumId });
       if (!albumDoc) return { error: "Album not found after upsert." }; // Should not happen
       return { album: albumDoc };
-    } catch (e: unknown) { // Explicitly type 'e' as unknown
-      return { error: `Failed to load album ${externalId}: ${(e instanceof Error ? e.message : String(e))}` };
+    } catch (e) {
+      return { error: `Failed to load album ${externalId}: ${e.message}` };
     }
   }
 
@@ -310,8 +666,8 @@ export default class MusicDiscoveryConcept {
       const artistDoc = await this.artists.findOne({ _id: artistId });
       if (!artistDoc) return { error: "Artist not found after upsert." }; // Should not happen
       return { artist: artistDoc };
-    } catch (e: unknown) { // Explicitly type 'e' as unknown
-      return { error: `Failed to load artist ${externalId}: ${(e instanceof Error ? e.message : String(e))}` };
+    } catch (e) {
+      return { error: `Failed to load artist ${externalId}: ${e.message}` };
     }
   }
 
@@ -340,8 +696,8 @@ export default class MusicDiscoveryConcept {
         if (trackDoc) upsertedTracks.push(trackDoc);
       }
       return { tracks: upsertedTracks };
-    } catch (e: unknown) { // Explicitly type 'e' as unknown
-      return { error: `Failed to load tracks for album ${albumId}: ${(e instanceof Error ? e.message : String(e))}` };
+    } catch (e) {
+      return { error: `Failed to load tracks for album ${albumId}: ${e.message}` };
     }
   }
 
@@ -378,8 +734,8 @@ export default class MusicDiscoveryConcept {
       );
 
       return { albums: upsertedAlbums };
-    } catch (e: unknown) { // Explicitly type 'e' as unknown
-      return { error: `Failed to load albums for artist ${artistId}: ${(e instanceof Error ? e.message : String(e))}` };
+    } catch (e) {
+      return { error: `Failed to load albums for artist ${artistId}: ${e.message}` };
     }
   }
 
@@ -476,3 +832,4 @@ export default class MusicDiscoveryConcept {
     return item ? [{ musicEntity: item }] : [];
   }
 }
+```

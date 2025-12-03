@@ -1,3 +1,26 @@
+---
+timestamp: 'Mon Dec 01 2025 23:23:15 GMT-0500 (Eastern Standard Time)'
+parent: '[[../20251201_232315.e2424c99.md]]'
+content_id: 1d5f78210abf47cd7e7db429c7007401ac845d844101ec99424746df39b3ce05
+---
+
+# response:
+
+You're encountering the TypeScript error `'e' is of type 'unknown'` because by default, catch block variables are typed as `unknown`. This is a safety feature in TypeScript to prevent you from making assumptions about the type of error caught.
+
+To fix this, you need to either:
+
+1. **Assert the type**: Cast `e` to `Error` if you're confident it will be an `Error` instance.
+2. **Narrow the type**: Use `instanceof Error` to check the type.
+3. **Convert to string**: Use `String(e)` to safely convert any `unknown` value to a string.
+
+Given that the `spotifyService` methods are explicitly throwing `Error` objects, asserting or narrowing to `Error` is appropriate here to access the `message` property.
+
+Let's update the `catch` blocks in `src/concepts/MusicDiscovery/MusicDiscoveryConcept.ts`:
+
+**file: src/concepts/MusicDiscovery/MusicDiscoveryConcept.ts**
+
+```typescript
 import { Collection, Db } from "npm:mongodb";
 import { Empty, ID } from "@utils/types.ts";
 import { freshID } from "@utils/database.ts";
@@ -476,3 +499,27 @@ export default class MusicDiscoveryConcept {
     return item ? [{ musicEntity: item }] : [];
   }
 }
+```
+
+**Changes Made:**
+
+In each `catch` block within the `MusicDiscoveryConcept` methods, I've changed:
+
+```typescript
+} catch (e) {
+  return { error: `Failed to ...: ${e.message}` };
+}
+```
+
+to:
+
+```typescript
+} catch (e: unknown) { // Explicitly annotate 'e' as unknown
+  return { error: `Failed to ...: ${(e instanceof Error ? e.message : String(e))}` };
+}
+```
+
+This change handles the `unknown` type safely by:
+
+1. Explicitly marking `e` as `unknown` (though TypeScript does this by default if `useUnknownInCatchVariables` is `true`).
+2. Using `e instanceof Error ? e.message : String(e)` to safely extract the error message. If `e` is an instance of `Error`, its `message` property is used. Otherwise, `String(e)` is used to convert whatever `e` is into a string representation, preventing the `unknown` type error.

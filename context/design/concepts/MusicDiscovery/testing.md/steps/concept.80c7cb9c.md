@@ -1,15 +1,8 @@
-[@concept-design-overview](../../background/concept-design-overview.md)
-
-[@concept-specifications](../../background/concept-specifications.md)
-
-[@implementing-concepts](../../background/implementing-concepts.md)
-
-[@concept-rubric](../../background/detailed/concept-rubric.md)
-
-[@concept-state](../../background/detailed/concept-state.md)
-
-[@spotify-utils](../../../src/utils/spotify.ts)
-
+---
+timestamp: 'Mon Dec 01 2025 21:19:02 GMT-0500 (Eastern Standard Time)'
+parent: '[[../20251201_211902.d09329b7.md]]'
+content_id: 80c7cb9c709a910540de393afa00f7480fca689b0b2b7bf587c21e282c2f9645
+---
 
 # concept: MusicDiscovery \[User]
 

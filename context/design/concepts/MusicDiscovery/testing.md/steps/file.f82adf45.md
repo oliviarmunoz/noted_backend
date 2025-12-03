@@ -1,3 +1,12 @@
+---
+timestamp: 'Mon Dec 01 2025 23:29:30 GMT-0500 (Eastern Standard Time)'
+parent: '[[../20251201_232930.dddb106f.md]]'
+content_id: f82adf458d3623ed1f67962a0ab5666bddba057df6ea14a69eeafc4fa25d5e18
+---
+
+# file: src/utils/spotify.ts
+
+```typescript
 import "jsr:@std/dotenv/load";
 
 const CLIENT_ID = Deno.env.get("CLIENT_ID");
@@ -283,7 +292,7 @@ export class SpotifyService {
       headers: {
         "Authorization": `Bearer ${accessToken}`,
       },
-    });
+    );
 
     if (!response.ok) {
       throw new Error(`Spotify API error: ${response.statusText}`);
@@ -318,7 +327,7 @@ export class SpotifyService {
       headers: {
         "Authorization": `Bearer ${accessToken}`,
       },
-    });
+    );
 
     if (!response.ok) {
       throw new Error(`Spotify API error: ${response.statusText}`);
@@ -329,11 +338,13 @@ export class SpotifyService {
 }
 
 // Export a singleton instance
-export const spotifyService = new SpotifyService();
+const spotifyService = new SpotifyService();
 
-// Example Spotify Service Calls
+// Combined export statement to make both class and instance explicitly available
+export { SpotifyService, spotifyService };
 
-// For specific track searches, use searchTrackByName with artist name for better results
+// Example Spotify Service Calls - Commented out to prevent execution on module import
+/*
 spotifyService.searchTrackByName("Need You Now", undefined, 10).then(found_tracks => {
   console.log("Found song:");
   console.log(found_tracks.tracks.items[0].name, "by", found_tracks.tracks.items[0].artists[0].name);
@@ -343,16 +354,6 @@ spotifyService.searchTrackByName("Need You Now", undefined, 10).then(found_track
 }).catch(error => {
   console.error("Test failed:", error);
 });
-
-// For general searches (when you don't know the exact track/artist), use searchAll
-// spotifyService.searchAll("Need You Now", 10).then(found_tracks => {
-//   console.log("Found song:");
-//   console.log(found_tracks.tracks.items[0].name, "by", found_tracks.tracks.items[0].artists[0].name);
-//   console.log("Spotify URL:", found_tracks.tracks.items[0].external_urls.spotify);
-//   console.log("URI:", found_tracks.tracks.items[0].uri);
-// }).catch(error => {
-//   console.error("Test failed:", error);
-// });
 
 spotifyService.searchAlbums("need you now lady a").then(async (found_albums) => {
   console.log("Found album:");
@@ -370,3 +371,5 @@ spotifyService.searchAlbums("need you now lady a").then(async (found_albums) => 
 //     console.log("URI:", track.uri);
 //   }
 // })
+*/
+```

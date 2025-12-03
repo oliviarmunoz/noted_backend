@@ -1,4 +1,13 @@
-import { assertEquals, assertExists, assertArrayIncludes } from "jsr:@std/assert";
+---
+timestamp: 'Mon Dec 01 2025 23:34:01 GMT-0500 (Eastern Standard Time)'
+parent: '[[../20251201_233401.6f6b748d.md]]'
+content_id: ceaa57d2a1488c1d4b1dea7a2f099ce61fc3dc516029cc591c676c5ef80f3f70
+---
+
+# file: src/concepts/MusicDiscovery/MusicDiscoveryConcept.test.ts
+
+```typescript
+import { assertEquals, assertExists, assertNotEquals, assertArrayIncludes } from "jsr:@std/assert";
 import { testDb } from "@utils/database.ts";
 import { ID } from "@utils/types.ts";
 import MusicDiscoveryConcept from "./MusicDiscoveryConcept.ts";
@@ -512,3 +521,4 @@ Deno.test("Queries: _getEntityFromId and _getEntityFromUri work correctly", asyn
     await client.close();
   }
 });
+```

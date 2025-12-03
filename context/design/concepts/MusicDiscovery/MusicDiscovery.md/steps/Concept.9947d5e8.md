@@ -1,47 +1,44 @@
-[@concept-design-overview](../../background/concept-design-overview.md)
+---
+timestamp: 'Mon Dec 01 2025 20:18:31 GMT-0500 (Eastern Standard Time)'
+parent: '[[../20251201_201831.6094b4d3.md]]'
+content_id: 9947d5e89f1a3df472cb6b71ca37145c84814121c263756cd391f89504e6cdca
+---
 
-[@concept-specifications](../../background/concept-specifications.md)
+# Concept: MusicDiscovery \[User]
 
-[@implementing-concepts](../../background/implementing-concepts.md)
+**purpose** allow users to search for and retrieve specific music entities from a global catalog, creating a persistent local cache of discovered content.
 
-[@concept-rubric](../../background/detailed/concept-rubric.md)
+**principle**
+Users interact with the concept by searching for text or requesting specific items. The concept fetches data from an external provider and stores it in a catalog hierarchy: generic items for search display, and specialized subsets (Tracks, Albums, Artists) for detailed views.
 
-[@concept-state](../../background/detailed/concept-state.md)
+**state**
 
-[@spotify-utils](../../../src/utils/spotify.ts)
+```ssf
+a set of MusicItems with
+  an externalId String
+  a name String
+  a uri String
+  a imageUrl String
+  an externalUrl String
 
+a Tracks set of MusicItems with
+  a durationMs Number
+  an explicit Flag
+  an albumId String       // Link to Album
+  an artistId String      // Link to primary Artist
 
-# concept: MusicDiscovery \[User]
+a Albums set of MusicItems with
+  a releaseDate String
+  an artistId String      // Link to primary Artist
+  a totalTracks Number
 
-* **concept**: Friending \[User]
+a Artists set of MusicItems with
+  a popularity Number
+  a genres set of String
 
-* **purpose** allow users to search for and retrieve specific music entities from a global catalog, creating a persistent local cache of discovered content.
-
-* **principle** a user can search for any kind of music item (track, album, artist), and the music information will be fetched from an external provider; this information will then be stored in a catalog; users may clear their search whenever they desire.
-
-* **state**
-  * a set of MusicItems with
-    * an externalId String
-    * a name String
-    * a uri String
-    * a imageUrl String
-    * an externalUrl String
-
-  * a Tracks set of MusicItems with
-    * a durationMs Number
-    * an albumId String       // Link to Album
-    * an artistId String      // Link to primary Artist
-
-  * an Albums set of MusicItems with
-    * a releaseDate String
-    * an artistId String      // Link to primary Artist
-    * a totalTracks Number
-
-  * a Artists set of MusicItems with
-    * an Albums set of MusicItems
-
-  * a set of Users with
-    * a searchResults set of MusicItems
+a set of Users with
+  a searchResults set of MusicItems
+```
 
 **actions**
 
@@ -97,9 +94,3 @@
 
 * **\_getItem** (externalId: String): (item: MusicItem)
   * **effects**: Returns the generic `MusicItem` (useful if you don't know the type yet).
-
-* **\_getEntityFromId** (externalId: String): (musicEntity: MusicEntity)
-  * **effects**: Returns the `MusicEntity` with the given external id.
-
-* **\_getEntityFromUri** (uri: String): (musicEntity: MusicEntity)
-  * **effects**: Returns the `MusicEntity` with the given external uri.

@@ -1,4 +1,13 @@
-import { assertEquals, assertExists, assertArrayIncludes } from "jsr:@std/assert";
+---
+timestamp: 'Mon Dec 01 2025 23:31:57 GMT-0500 (Eastern Standard Time)'
+parent: '[[../20251201_233157.6551ed73.md]]'
+content_id: 4df6633f05c1d62072ebcb357728b9cbfad7234e04dc190e134e6605e1c1d35d
+---
+
+# file: src/concepts/MusicDiscovery/MusicDiscoveryConcept.test.ts
+
+```typescript
+import { assertEquals, assertExists, assertNotEquals, assertArrayIncludes } from "jsr:@std/assert";
 import { testDb } from "@utils/database.ts";
 import { ID } from "@utils/types.ts";
 import MusicDiscoveryConcept from "./MusicDiscoveryConcept.ts";
@@ -208,13 +217,13 @@ Deno.test("Action: search upserts various types and updates user results", async
     };
 
     // Mock necessary get* calls for upserts
-    spotifyService.getTrack = async (id) => (id === "spotify-track-allmylife" ? { id, name: "All My Life", uri: "spotify:track:allmylife", duration_ms: 263000, album: { id: "spotify-album-allmylife", name: "All My Life", images: [{ url: "http://img.com/album.jpg" }] }, artists: [{ id: "spotify-artist-foofighters", name: "Foo Fighters" }] } : Promise.reject(new Error("Mock getTrack not found")));
+    spotifyService.getTrack = async (id) => (id === "spotify-track-allmylife" ? { id, name: "All My Life", uri: "spotify:track:allmylife", duration_ms: 263000, album: { id: "spotify-album-allmylife", name: "All My Life", images: [{ url: "http://img.com/album.jpg" }] }, artists: [{ id: "spotify-artist-foofighters", name: "Foo Fighters" }] } : Promise.reject("Mock getTrack not found"));
     spotifyService.getAlbum = async (id) => {
       if (id === "spotify-album-allmylife") return { id, name: "All My Life", uri: "spotify:album:allmylife", release_date: "2002-10-22", total_tracks: 11, images: [{ url: "http://img.com/album.jpg" }], artists: [{ id: "spotify-artist-foofighters", name: "Foo Fighters" }] };
       if (id === "spotify-album-thecolourandtheshape") return { id, name: "The Colour And The Shape", uri: "spotify:album:thecolourandtheshape", release_date: "1997-05-20", total_tracks: 13, images: [{ url: "http://img.com/album_color.jpg" }], artists: [{ id: "spotify-artist-foofighters", name: "Foo Fighters" }] };
       throw new Error(`Mock getAlbum not found: ${id}`);
     };
-    spotifyService.getArtist = async (id) => (id === "spotify-artist-foofighters" ? { id, name: "Foo Fighters", uri: "spotify:artist:foofighters", images: [{ url: "http://img.com/foofighters.jpg" }] } : Promise.reject(new Error("Mock getArtist not found")));
+    spotifyService.getArtist = async (id) => (id === "spotify-artist-foofighters" ? { id, name: "Foo Fighters", uri: "spotify:artist:foofighters", images: [{ url: "http://img.com/foofighters.jpg" }] } : Promise.reject("Mock getArtist not found"));
 
     await t.step("User B searches for 'All My Life' across all types", async () => {
       const searchResult = await musicDiscovery.search({ user: userB, query: "All My Life", type: "track,album,artist" });
@@ -314,6 +323,7 @@ Deno.test("Action: loadAlbumTracks loads and links tracks to an album", async (t
   const musicDiscovery = new MusicDiscoveryConcept(db);
 
   try {
+    // 1. Load an album first to get an internal albumId
     const albumExternalId = "album-darksideofmoon";
     const artistExternalId = "artist-pinkfloyd";
 
@@ -326,17 +336,16 @@ Deno.test("Action: loadAlbumTracks loads and links tracks to an album", async (t
       throw new Error(`Mock getArtist not found: ${id}`);
     };
 
-    // Perform the initial album loading directly in the main test scope
-    const loadAlbumResult = await musicDiscovery.loadAlbum({ externalId: albumExternalId });
-    if ("error" in loadAlbumResult) {
-      throw new Error(`Loading album unexpectedly failed: ${loadAlbumResult.error}`);
-    }
-    const { album: loadedAlbum } = loadAlbumResult;
-    const internalAlbumId = loadedAlbum._id; // internalAlbumId is now guaranteed to be assigned here
+    let internalAlbumId: ID;
 
-    await t.step("Loading album 'Dark Side of the Moon' (setup)", async () => {
-      assertExists(internalAlbumId); // Confirm setup
-      assertEquals(loadedAlbum.name, "Dark Side of the Moon");
+    await t.step("Loading album 'Dark Side of the Moon'", async () => {
+      const loadAlbumResult = await musicDiscovery.loadAlbum({ externalId: albumExternalId });
+      if ("error" in loadAlbumResult) {
+        throw new Error(`Loading album unexpectedly failed: ${loadAlbumResult.error}`);
+      }
+      const { album: loadedAlbum } = loadAlbumResult;
+      internalAlbumId = loadedAlbum._id;
+      assertExists(internalAlbumId);
     });
 
     // 2. Mock getAlbumTracks and getTrack for individual tracks
@@ -385,6 +394,7 @@ Deno.test("Action: loadArtistAlbums loads and links albums to an artist", async 
   const musicDiscovery = new MusicDiscoveryConcept(db);
 
   try {
+    // 1. Load an artist first to get an internal artistId
     const artistExternalId = "artist-taylorswift";
     spotifyService.getArtist = async (id) => {
       if (id === artistExternalId) return { id, name: "Taylor Swift", uri: "spotify:artist:taylorswift", images: [{ url: "http://img.com/taylor.jpg" }] };
@@ -396,17 +406,16 @@ Deno.test("Action: loadArtistAlbums loads and links albums to an artist", async 
       throw new Error(`Mock getAlbum not found: ${id}`);
     };
 
-    // Perform the initial artist loading directly in the main test scope
-    const loadArtistResult = await musicDiscovery.loadArtist({ externalId: artistExternalId });
-    if ("error" in loadArtistResult) {
-      throw new Error(`Loading artist unexpectedly failed: ${loadArtistResult.error}`);
-    }
-    const { artist: loadedArtist } = loadArtistResult;
-    const internalArtistId = loadedArtist._id; // internalArtistId is now guaranteed to be assigned here
+    let internalArtistId: ID;
 
-    await t.step("Loading artist 'Taylor Swift' (setup)", async () => {
-      assertExists(internalArtistId); // Confirm setup
-      assertEquals(loadedArtist.name, "Taylor Swift");
+    await t.step("Loading artist 'Taylor Swift'", async () => {
+      const loadArtistResult = await musicDiscovery.loadArtist({ externalId: artistExternalId });
+      if ("error" in loadArtistResult) {
+        throw new Error(`Loading artist unexpectedly failed: ${loadArtistResult.error}`);
+      }
+      const { artist: loadedArtist } = loadArtistResult;
+      internalArtistId = loadedArtist._id;
+      assertExists(internalArtistId);
     });
 
     // 2. Mock getArtistAlbums
@@ -512,3 +521,4 @@ Deno.test("Queries: _getEntityFromId and _getEntityFromUri work correctly", asyn
     await client.close();
   }
 });
+```
