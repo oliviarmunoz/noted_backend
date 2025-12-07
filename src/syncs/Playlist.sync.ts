@@ -18,3 +18,12 @@ export const CreateFavorites: Sync = ({ user }) => ({
     [Playlist.createPlaylist, { user, playlistName: "Favorites" }],
   ),
 });
+
+export const CreateFriendRecommendations: Sync = ({ user }) => ({
+  when: actions(
+    [UserAuthentication.register, {}, { user }],
+  ),
+  then: actions(
+    [Playlist.createPlaylist, { user, playlistName: "Friend Recommendations" }],
+  ),
+});
