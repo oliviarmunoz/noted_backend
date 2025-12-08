@@ -63,5 +63,9 @@ export const exclusions: Array<string> = [
   "/api/UserAuthentication/register",
   "/api/UserAuthentication/authenticate",
   "/api/Playlist/createPlaylist",
-  "/api/Playlist/deletePlaylist"
+  "/api/Playlist/deletePlaylist",
+  "/api/Playlist/addItem",
+  "/api/Playlist/deleteItem",
+  "/api/Playlist/_getPlaylistItems",
+  "api/Playlist/_getUserPlaylists",
 ];

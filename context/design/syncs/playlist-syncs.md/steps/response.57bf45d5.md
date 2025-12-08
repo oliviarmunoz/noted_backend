@@ -1,33 +1,21 @@
+---
+timestamp: 'Sun Dec 07 2025 19:31:06 GMT-0500 (Eastern Standard Time)'
+parent: '[[../20251207_193106.3862eab5.md]]'
+content_id: 57bf45d5384a1bc8caa5f8b8732818445bca89322d8571d9dd02bfc32d2483c9
+---
+
+# response:
+
+Here are the playlist-related synchronizations, modeled after the provided examples and updated to correctly handle the interactions and error conditions.
+
+```typescript
+// src/syncs/playlist.sync.ts
+
 import { actions, Frames, Sync } from "@engine";
-import { Requesting, Session, MusicDiscovery, UserAuthentication, Playlist } from "@concepts";
-import { ID } from "@utils/types.ts"; // Import ID type if used in patterns
+import { Requesting, Sessioning, MusicDiscovery, Playlist } from "@concepts";
+import { ID } from "@utils/types.ts";
 
-export const CreateListenLater: Sync = ({ user }) => ({
-  when: actions(
-    [UserAuthentication.register, {}, { user }],
-  ),
-  then: actions(
-    [Playlist.createPlaylist, { user, playlistName: "Listen Later" }],
-  ),
-});
-
-export const CreateFavorites: Sync = ({ user }) => ({
-  when: actions(
-    [UserAuthentication.register, {}, { user }],
-  ),
-  then: actions(
-    [Playlist.createPlaylist, { user, playlistName: "Favorites" }],
-  ),
-});
-
-export const CreateFriendRecommendations: Sync = ({ user }) => ({
-  when: actions(
-    [UserAuthentication.register, {}, { user }],
-  ),
-  then: actions(
-    [Playlist.createPlaylist, { user, playlistName: "Friend Recommendations" }],
-  ),
-});
+// Define the generic type for Item from the Playlist concept
 type Item = ID; // Item here represents the externalId of a MusicEntity
 type PlaylistId = ID; // Using PlaylistId for clarity to distinguish from playlistName string
 
@@ -36,53 +24,12 @@ type PlaylistId = ID; // Using PlaylistId for clarity to distinguish from playli
  * @purpose Enable users to establish and manage collections of items.
  *
  * This file contains synchronizations for the Playlist concept.
- * It orchestrates interactions between Requesting, Session, MusicDiscovery, and Playlist concepts.
+ * It orchestrates interactions between Requesting, Sessioning, MusicDiscovery, and Playlist concepts.
  */
 
-// --- Helper for creating a single error frame with a consistent structure ---
+// --- Helper for creating a single error frame ---
 const createErrorFrame = (originalFrame: Record<symbol, unknown>, errorMessage: string): Frames => {
   return new Frames({ ...originalFrame, error: errorMessage });
-};
-
-// --- Helper to find a specific playlist by name within a set of user playlists ---
-// This will replace the functionality of the non-existent Playlist._getPlaylistByNameAndUser
-const findUserPlaylistByName = async (
-  frames: Frames,
-  userSymbol: symbol, // Symbol for the bound 'user' variable
-  playlistNameSymbol: symbol, // Symbol for the bound 'playlistName' variable
-  outputPlaylistIdSymbol: symbol, // Symbol for where to bind the found playlist ID
-  isPublicSymbol: symbol
-): Promise<Frames> => {
-  const originalFrame = frames[0];
-
-  // Query all playlists for the user
-  const allUserPlaylistsFrames = await frames.query(Playlist._getUserPlaylists, { user: userSymbol }, {
-    playlistName: playlistNameSymbol,
-    isPublic: isPublicSymbol,
-    playlistId: outputPlaylistIdSymbol, // Bind the found playlist ID to the specified symbol
-  });
-
-  // Filter to find the specific playlist by name
-  const targetPlaylistFrames = allUserPlaylistsFrames.filter(
-    ($) => $[userSymbol] === originalFrame[userSymbol] && $[playlistNameSymbol] === originalFrame[playlistNameSymbol],
-  );
-
-  if (targetPlaylistFrames.length === 0) {
-    return new Frames(); // Return empty frames if playlist not found for user
-  }
-
-  // Only return the frame(s) corresponding to the matched playlist,
-  // ensuring the outputPlaylistIdSymbol is correctly bound.
-  // We explicitly return a new Frames object to ensure only the matched playlist's data is propagated
-  return new Frames(
-    ...targetPlaylistFrames.map(($) => ({
-      ...originalFrame, // Preserve original request context
-      [userSymbol]: $[userSymbol],
-      [playlistNameSymbol]: $[playlistNameSymbol],
-      [outputPlaylistIdSymbol]: $[outputPlaylistIdSymbol], // The actual playlist ID
-      // You can add other relevant bindings if needed, e.g., isPublic
-    })),
-  );
 };
 
 
@@ -104,22 +51,24 @@ export const CreatePlaylistRequest: Sync = ({ request, session, playlistName, is
     const originalRequestFrame = frames[0]; // Preserve original request details for response
 
     // 1. Authenticate user from session
-    const currentFrames = await frames.query(Session._getUser, { session }, { user });
+    let currentFrames = await frames.query(Sessioning._getUser, { session }, { user });
     if (currentFrames.length === 0) {
       return createErrorFrame(originalRequestFrame, "Invalid session or user not found.");
     }
     // `currentFrames` now has `user` bound.
+
     // No explicit check for existing playlist name here in sync,
     // as Playlist.createPlaylist action itself includes that precondition check
     // and returns an error if violated. This follows the principle of "Completeness of functionality"
     // where the concept action is responsible for its own validation.
+
     return currentFrames;
   },
   then: actions([
     // Playlist.createPlaylist will return { playlist: PlaylistId } on success or { error: string } on failure.
     // Subsequent syncs (CreatePlaylistResponseSuccess/Error) will pick this up.
     Playlist.createPlaylist,
-    { user, playlistName, isPublic }, // Pass actual bound variables
+    { user, playlistName, isPublic },
   ]),
 });
 
@@ -155,7 +104,7 @@ export const CreatePlaylistResponseError: Sync = ({ request, error }) => ({
  * Handles the HTTP request for deleting an entire playlist.
  * It authenticates the user and verifies ownership of the playlist before calling the concept action.
  */
-export const DeletePlaylistRequest: Sync = ({ request, session, playlistName, user, playlistId, isPublic }) => ({
+export const DeletePlaylistRequest: Sync = ({ request, session, playlistName, user }) => ({
   when: actions([
     Requesting.request,
     { path: "/playlist/delete_playlist", session, playlistName },
@@ -165,19 +114,17 @@ export const DeletePlaylistRequest: Sync = ({ request, session, playlistName, us
     const originalRequestFrame = frames[0];
 
     // 1. Authenticate user from session
-    const currentFrames = await frames.query(Session._getUser, { session }, { user });
+    let currentFrames = await frames.query(Sessioning._getUser, { session }, { user });
     if (currentFrames.length === 0) {
       return createErrorFrame(originalRequestFrame, "Invalid session or user not found.");
     }
 
     // 2. Ensure the playlist exists and belongs to the authenticated user.
-    // Use the helper to find the playlist by name and bind its ID if found.
-    const playlistFoundFrames = await findUserPlaylistByName(currentFrames, user, playlistName, playlistId, isPublic);
-    if (playlistFoundFrames.length === 0) {
-      return createErrorFrame(originalRequestFrame, `Playlist not found or does not belong to user.`);
+    const playlistCheckFrames = await currentFrames.query(Playlist._getPlaylistByNameAndUser, { user: currentFrames[0][user], playlistName: currentFrames[0].playlistName }, { playlist: "pId" });
+    if (playlistCheckFrames.length === 0) {
+      return createErrorFrame(originalRequestFrame, `Playlist '${currentFrames[0].playlistName}' not found or does not belong to user.`);
     }
 
-    // Pass original frames forward, as Playlist.deletePlaylist needs `user` and `playlistName` directly
     return currentFrames;
   },
   then: actions([
@@ -219,7 +166,7 @@ export const DeletePlaylistResponseError: Sync = ({ request, error }) => ({
  * It authenticates the user, ensures the playlist exists, and ensures the MusicEntity exists
  * (creating it via MusicDiscovery._getEntityFromId if necessary, which is now part of that query).
  */
-export const AddItemToPlaylistRequest: Sync = ({ request, session, playlistName, playlistId, isPublic, itemExternalId, itemType, user, musicEntity, entityLookupError }) => ({
+export const AddItemToPlaylistRequest: Sync = ({ request, session, playlistName, itemExternalId, itemType, user, musicEntity, entityLookupError }) => ({
   when: actions([
     Requesting.request,
     { path: "/playlist/add", session, playlistName, itemExternalId, itemType },
@@ -229,28 +176,29 @@ export const AddItemToPlaylistRequest: Sync = ({ request, session, playlistName,
     const originalRequestFrame = frames[0];
 
     // 1. Authenticate user from session
-    let currentFrames = await frames.query(Session._getUser, { session }, { user });
+    let currentFrames = await frames.query(Sessioning._getUser, { session }, { user });
     if (currentFrames.length === 0) {
       return createErrorFrame(originalRequestFrame, "Invalid session or user not found.");
     }
     // `currentFrames` now has `user` bound.
 
     // 2. Ensure the playlist belongs to the user and exists.
-    // Use the helper to find the playlist by name.
-    const playlistFoundFrames = await findUserPlaylistByName(currentFrames, user, playlistName, playlistId, isPublic);
-    if (playlistFoundFrames.length === 0) {
-      return createErrorFrame(originalRequestFrame, `Playlist not found or does not belong to user.`);
+    // Use the `user` and `playlistName` bindings from the current frame.
+    const playlistCheckFrames = await currentFrames.query(Playlist._getPlaylistByNameAndUser, { user: currentFrames[0][user], playlistName: currentFrames[0].playlistName }, { playlist: "pId" });
+    if (playlistCheckFrames.length === 0) {
+      return createErrorFrame(originalRequestFrame, `Playlist '${currentFrames[0].playlistName}' not found or does not belong to user.`);
     }
-    // Ensure the `user` and `playlistName` from the request context are retained for later actions.
-    // The `pId` from `playlistFoundFrames` is not directly used in Playlist.addItem inputs, but confirms existence.
+    // `playlist: "pId"` is a local variable for this check. The actual `Playlist.addItem` action
+    // uses `user` and `playlistName` from the input arguments directly.
 
-    // 3. Ensure MusicEntity exists locally or fetch/create from Spotify using _getEntityFromId query.
+    // 3. Ensure MusicEntity exists locally or fetch/create from Spotify using _getEntityFromId query
     // _getEntityFromId can return { musicEntity: ... } or { error: ... } or [].
-    // It's crucial to pass `itemExternalId` and `itemType` which are in the original frame.
-    const entityResolutionFrames = await currentFrames.query(MusicDiscovery._getEntityFromId, { externalId: itemExternalId, type: itemType }, { musicEntity, error: entityLookupError });
+    let entityResolutionFrames = await currentFrames.query(MusicDiscovery._getEntityFromId, { externalId: currentFrames[0].itemExternalId, type: currentFrames[0].itemType }, { musicEntity, error: entityLookupError });
 
     if (entityResolutionFrames.length === 0) {
-      return createErrorFrame(originalRequestFrame, `Music entity for external ID could not be retrieved or created.`);
+      // This case should ideally not happen if _getEntityFromId always returns an object or an error.
+      // It implies a deeper issue in MusicDiscovery._getEntityFromId if no error is present.
+      return createErrorFrame(originalRequestFrame, `Music entity for external ID '${currentFrames[0].itemExternalId}' could not be retrieved or created.`);
     }
     if (entityResolutionFrames[0][entityLookupError]) { // Explicit error from the query
       return createErrorFrame(originalRequestFrame, entityResolutionFrames[0][entityLookupError] as string);
@@ -258,9 +206,14 @@ export const AddItemToPlaylistRequest: Sync = ({ request, session, playlistName,
     // `entityResolutionFrames` now holds the `musicEntity` (internal ID) and potentially `entityLookupError`.
     currentFrames = entityResolutionFrames; // Propagate these bindings
 
-    // 4. Check if item is already in the playlist (pre-condition for addItem in PlaylistConcept).
-    // The Playlist.addItem action itself performs this check and returns an error if violated.
-    // We don't need an explicit 'where' filter here for this, relying on the concept's action.
+    // 4. Check if item is already in the playlist (pre-condition for addItem in PlaylistConcept)
+    // Query the specific playlist's items.
+    const playlistItemsFrames = await currentFrames.query(Playlist._getPlaylistItems, { user: currentFrames[0][user], playlistName: currentFrames[0].playlistName }, { item: "existingItem" });
+    const isAlreadyInPlaylist = playlistItemsFrames.some(f => f.existingItem === currentFrames[0].itemExternalId);
+
+    if (isAlreadyInPlaylist) {
+      return createErrorFrame(originalRequestFrame, `Item '${currentFrames[0].itemExternalId}' is already in playlist '${currentFrames[0].playlistName}'.`);
+    }
 
     return currentFrames; // All conditions met, proceed to then clause
   },
@@ -302,7 +255,7 @@ export const AddItemToPlaylistResponseError: Sync = ({ request, error }) => ({
  * Handles the HTTP request for deleting an item from a playlist.
  * It authenticates the user, ensures the playlist exists, and that the item is in the playlist.
  */
-export const DeleteItemFromPlaylistRequest: Sync = ({ request, session, playlistName, playlistId, isPublic, itemExternalId, user }) => ({
+export const DeleteItemFromPlaylistRequest: Sync = ({ request, session, playlistName, itemExternalId, user }) => ({
   when: actions([
     Requesting.request,
     { path: "/playlist/delete", session, playlistName, itemExternalId },
@@ -312,21 +265,23 @@ export const DeleteItemFromPlaylistRequest: Sync = ({ request, session, playlist
     const originalRequestFrame = frames[0];
 
     // 1. Authenticate user from session
-    const currentFrames = await frames.query(Session._getUser, { session }, { user });
+    let currentFrames = await frames.query(Sessioning._getUser, { session }, { user });
     if (currentFrames.length === 0) {
       return createErrorFrame(originalRequestFrame, "Invalid session or user not found.");
     }
 
     // 2. Ensure the playlist belongs to the user and exists.
-    const playlistFoundFrames = await findUserPlaylistByName(currentFrames, user, playlistName, playlistId, isPublic);
-    if (playlistFoundFrames.length === 0) {
-      return createErrorFrame(originalRequestFrame, `Playlist not found or does not belong to user.`);
+    const playlistCheckFrames = await currentFrames.query(Playlist._getPlaylistByNameAndUser, { user: currentFrames[0][user], playlistName: currentFrames[0].playlistName }, { playlist: "pId" });
+    if (playlistCheckFrames.length === 0) {
+      return createErrorFrame(originalRequestFrame, `Playlist '${currentFrames[0].playlistName}' not found or does not belong to user.`);
     }
 
-    // 3. Check if the item is actually in the playlist (pre-condition for deleteItem in PlaylistConcept).
-    // The Playlist.deleteItem action itself performs this check and returns an error if violated.
-    // We don't need an explicit 'where' filter here for this, relying on the concept's action.
-
+    // 3. Ensure the item is actually in the playlist (pre-condition for deleteItem in PlaylistConcept)
+    const playlistItemsFrames = await currentFrames.query(Playlist._getPlaylistItems, { user: currentFrames[0][user], playlistName: currentFrames[0].playlistName }, { item: "existingItem" });
+    const isItemInPlaylist = playlistItemsFrames.some(f => f.existingItem === currentFrames[0].itemExternalId);
+    if (!isItemInPlaylist) {
+      return createErrorFrame(originalRequestFrame, `Item '${currentFrames[0].itemExternalId}' not found in playlist '${currentFrames[0].playlistName}'.`);
+    }
     return currentFrames; // All conditions met, proceed
   },
   then: actions([
@@ -376,19 +331,21 @@ export const GetUserPlaylistsRequest: Sync = ({ request, session, user, playlist
     const originalRequestFrame = frames[0];
     
     // 1. Authenticate user from session
-    const currentFrames = await frames.query(Session._getUser, { session }, { user });
+    let currentFrames = await frames.query(Sessioning._getUser, { session }, { user });
     if (currentFrames.length === 0) {
       // If no valid session/user, return an empty list of playlists immediately.
-      return new Frames({ ...originalRequestFrame, [playlists]: [] });
+      return new Frames({ ...originalRequestFrame, [playlists]: [] }); // Ensure `playlists` is an empty array symbol
     }
 
     // 2. Query for user's playlists
-    // Note: Playlist._getUserPlaylists already returns data in the format { playlistName, isPublic }
-    // We need to extract these fields for collectAs.
     const playlistResultsFrames = await currentFrames.query(Playlist._getUserPlaylists, { user: currentFrames[0][user] }, { playlistName, isPublic });
     
     // 3. Collect the playlist details into a single 'playlists' array.
-    // The collectAs function is designed to handle empty input frames by producing an empty array for the collected symbol.
+    // collectAs handles the case where playlistResultsFrames is empty by producing an empty array for 'playlists'
+    // when grouping by the remaining common elements.
+    // However, if the initial `currentFrames` itself has no common elements with `playlistResultsFrames`
+    // (e.g., `user` is the only common element), then `collectAs` will correctly merge all results.
+    // If playlistResultsFrames is empty, collectAs will return a frame with an empty array for 'playlists'.
     return playlistResultsFrames.collectAs([playlistName, isPublic], playlists);
   },
   then: actions([Requesting.respond, { request, playlists }]), // Pass actual bound variable
@@ -402,7 +359,7 @@ export const GetUserPlaylistsRequest: Sync = ({ request, session, user, playlist
  * Handles the HTTP request for retrieving all items (external IDs) in a specific playlist.
  * It authenticates the user and ensures the playlist belongs to them.
  */
-export const GetPlaylistItemsRequest: Sync = ({ request, session, playlistName, playlistId, isPublic, user, item, items }) => ({
+export const GetPlaylistItemsRequest: Sync = ({ request, session, playlistName, user, item, items }) => ({
   when: actions([
     Requesting.request,
     { path: "/playlist/:playlistName/items", session, playlistName },
@@ -412,89 +369,25 @@ export const GetPlaylistItemsRequest: Sync = ({ request, session, playlistName, 
     const originalRequestFrame = frames[0];
     
     // 1. Authenticate user from session
-    const currentFrames = await frames.query(Session._getUser, { session }, { user });
+    let currentFrames = await frames.query(Sessioning._getUser, { session }, { user });
     if (currentFrames.length === 0) {
       return createErrorFrame(originalRequestFrame, "Invalid session or user not found.");
     }
 
     // 2. Ensure the playlist belongs to the user and exists.
-    const playlistFoundFrames = await findUserPlaylistByName(currentFrames, user, playlistName, playlistId, isPublic);
-    if (playlistFoundFrames.length === 0) {
-      return createErrorFrame(originalRequestFrame, `Playlist not found or does not belong to user.`);
+    const playlistCheckFrames = await currentFrames.query(Playlist._getPlaylistByNameAndUser, { user: currentFrames[0][user], playlistName: currentFrames[0].playlistName }, { playlist: "pId" });
+    if (playlistCheckFrames.length === 0) {
+      return createErrorFrame(originalRequestFrame, `Playlist '${currentFrames[0].playlistName}' not found or does not belong to user.`);
     }
 
     // 3. Query for playlist items (which are externalIds as per concept spec and PlaylistDoc type)
-    // Use playlistFoundFrames which has both user and playlistName bound
-    const itemResultsFrames = await playlistFoundFrames.query(Playlist._getPlaylistItems, { user: user, playlistName: playlistName }, { item });
+    const itemResultsFrames = await currentFrames.query(Playlist._getPlaylistItems, { user: currentFrames[0][user], playlistName: currentFrames[0].playlistName }, { item });
     
     // 4. Collect the items (externalIds) into a single 'items' array.
+    // Similar to GetUserPlaylists, collectAs correctly handles empty results by returning an empty array.
     return itemResultsFrames.collectAs([item], items);
   },
   then: actions([Requesting.respond, { request, items }]), // Pass actual bound variable
 });
 
-/**
- * sync GetPlaylistItemsResponseError
- * Responds to the client with an error if getting playlist items fails.
- * This handles errors returned from the where clause (e.g., invalid session, playlist not found).
- */
-export const GetPlaylistItemsResponseError: Sync = ({ request, error }) => ({
-  when: actions(
-    [Requesting.request, { path: "/playlist/:playlistName/items" }, { request }],
-  ),
-  where: async (frames) => {
-    // Match frames that have an error field (returned from where clause error frames)
-    return frames.filter(f => 'error' in f && f.error !== undefined);
-  },
-  then: actions([Requesting.respond, { request, error }]),
-});
-
-// --- Delete Playlist (by owner) ---
-// Note: This action is separate from deleting an item.
-export const DeletePlaylistByOwnerRequest: Sync = ({ request, session, playlistName, playlistId, user }) => ({
-  when: actions([
-    Requesting.request,
-    { path: "/playlist/delete_by_name", session, playlistName },
-    { request },
-  ]),
-  where: async (frames) => {
-    const originalRequestFrame = frames[0];
-
-    // 1. Authenticate user from session
-    const currentFrames = await frames.query(Session._getUser, { session }, { user });
-    if (currentFrames.length === 0) {
-      return createErrorFrame(originalRequestFrame, "Invalid session or user not found.");
-    }
-
-    // 2. Ensure the playlist exists and belongs to the authenticated user.
-    const playlistCheckFrames = await currentFrames.query(Playlist._getUserPlaylists, { user: user }, { playlistName: playlistName, playlistId: playlistId });
-    // Compare to the actual value from the original request frame, not the symbol
-    const targetPlaylistFrame = playlistCheckFrames.filter(f => f[playlistName] === originalRequestFrame[playlistName]);
-
-    if (targetPlaylistFrame.length === 0) {
-      return createErrorFrame(originalRequestFrame, `Playlist not found or does not belong to user.`);
-    }
-
-    return currentFrames;
-  },
-  then: actions([
-    Playlist.deletePlaylist,
-    { user, playlistName },
-  ]),
-});
-
-export const DeletePlaylistByOwnerResponseSuccess: Sync = ({ request }) => ({
-  when: actions(
-    [Requesting.request, { path: "/playlist/delete_by_name" }, { request }],
-    [Playlist.deletePlaylist, {}, {}],
-  ),
-  then: actions([Requesting.respond, { request, status: "success", message: "Playlist deleted successfully" }]),
-});
-
-export const DeletePlaylistByOwnerResponseError: Sync = ({ request, error }) => ({
-  when: actions(
-    [Requesting.request, { path: "/playlist/delete_by_name" }, { request }],
-    [Playlist.deletePlaylist, {}, { error }],
-  ),
-  then: actions([Requesting.respond, { request, error }]),
-});
+```
