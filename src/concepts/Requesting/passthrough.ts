@@ -86,6 +86,7 @@ export const exclusions: Array<string> = [
   "/api/Playlist/deletePlaylist",
   "/api/Playlist/addItem",
   "/api/Playlist/deleteItem",
+  "/api/Playlist/addItemToFriend",
 
   "/api/Profile/updateBio",
   "/api/Profile/updateThumbnail",

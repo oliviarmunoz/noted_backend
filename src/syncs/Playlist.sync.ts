@@ -1,6 +1,5 @@
 import { actions, Frames, Sync } from "@engine";
-import { Requesting, Session, MusicDiscovery, UserAuthentication, Playlist } from "@concepts";
-import { ID } from "@utils/types.ts"; // Import ID type if used in patterns
+import { Requesting, Session, UserAuthentication, Playlist } from "@concepts";
 
 export const CreateListenLater: Sync = ({ user }) => ({
   when: actions(
@@ -28,8 +27,6 @@ export const CreateFriendRecommendations: Sync = ({ user }) => ({
     [Playlist.createPlaylist, { user, playlistName: "Friend Recommendations" }],
   ),
 });
-type Item = ID; // Item here represents the externalId of a MusicEntity
-type PlaylistId = ID; // Using PlaylistId for clarity to distinguish from playlistName string
 
 /**
  * @concept Playlist
@@ -219,7 +216,7 @@ export const DeletePlaylistResponseError: Sync = ({ request, error }) => ({
  * It authenticates the user, ensures the playlist exists, and ensures the MusicEntity exists
  * (creating it via MusicDiscovery._getEntityFromId if necessary, which is now part of that query).
  */
-export const AddItemToPlaylistRequest: Sync = ({ request, session, playlistName, playlistId, isPublic, item, user, musicEntity, entityLookupError }) => ({
+export const AddItemToPlaylistRequest: Sync = ({ request, session, playlistName, item, user }) => ({
   when: actions([
     Requesting.request,
     { path: "/Playlist/addItem", session, item, playlistName },
@@ -278,7 +275,7 @@ export const AddItemToPlaylistResponseError: Sync = ({ request, error }) => ({
  * Handles the HTTP request for deleting an item from a playlist.
  * It authenticates the user, ensures the playlist exists, and that the item is in the playlist.
  */
-export const DeleteItemFromPlaylistRequest: Sync = ({ request, session, playlistName, playlistId, isPublic, item, user }) => ({
+export const DeleteItemFromPlaylistRequest: Sync = ({ request, session, playlistName, item, user }) => ({
   when: actions([
     Requesting.request,
     { path: "/Playlist/deleteItem", session, item, playlistName },
@@ -321,6 +318,60 @@ export const DeleteItemFromPlaylistResponseError: Sync = ({ request, error }) =>
   when: actions(
     [Requesting.request, { path: "/Playlist/deleteItem" }, { request }],
     [Playlist.deleteItem, {}, { error }], // Matches error return from deleteItem
+  ),
+  then: actions([Requesting.respond, { request, error }]),
+});
+
+/**
+ * sync AddItemToFriendRequest
+ * Handles the HTTP request for adding an item to a friend's recommendation playlist.
+ * It authenticates the user and adds the intended music item to the indicated playlist.
+ */
+export const AddItemToFriendPlaylistRequest: Sync = ({ request, session, playlistName, item, user, friend }) => ({
+  when: actions([
+    Requesting.request,
+    { path: "/Playlist/addItemToFriend", session, friend, item, playlistName },
+    { request },
+  ]),
+  where: async (frames) => {
+    const originalRequestFrame = frames[0];
+
+    // 1. Authenticate user from session
+    const currentFrames = await frames.query(Session._getUser, { session }, { user });
+    if (currentFrames.length === 0) {
+      return createErrorFrame(originalRequestFrame, "Invalid session or user not found.");
+    }
+
+    return currentFrames; // All conditions met, proceed to then clause
+  },
+  then: actions([
+    Playlist.addItem,
+    { user: friend, item, playlistName }, // Pass itemExternalId as 'item' as per concept spec
+  ]),
+});
+
+/**
+ * sync AddItemToFriendPlaylistResponseSuccess
+ * Responds to the client with success after an item is successfully add to a friend's 
+ * recommendation playlist.
+ */
+export const AddItemToFriendPlaylistResponseSuccess: Sync = ({ request }) => ({
+  when: actions(
+    [Requesting.request, { path: "/Playlist/addItemToFriend" }, { request }],
+    [Playlist.addItem, {}, {}], // Matches successful (empty) return from deleteItem
+  ),
+  then: actions([Requesting.respond, { request, status: "success" }]),
+});
+
+/**
+ * sync DeleteItemFromPlaylistResponseError
+ * Responds to the client with an error if adding an item to a friend.s recommendation
+ * playlist fails.
+ */
+export const AddItemToFriendPlaylistResponseError: Sync = ({ request, error }) => ({
+  when: actions(
+    [Requesting.request, { path: "/Playlist/addItemToFriend" }, { request }],
+    [Playlist.addItem, {}, { error }], // Matches error return from deleteItem
   ),
   then: actions([Requesting.respond, { request, error }]),
 });
