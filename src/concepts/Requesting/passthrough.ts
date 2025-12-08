@@ -44,7 +44,13 @@ export const inclusions: Record<string, string> = {
     "allow anyone to get a username by user id (public query)",
 
   // Session
-  "/api/Session/_getUser": "allow anyone to get a user by session id (public query)"
+  "/api/Session/_getUser": "allow anyone to get a user by session id (public query)",
+
+  // Playlist
+  "/api/Playlist/_getPlaylistItems":
+    "allow anyone to get all items from a playlist",
+  "api/Playlist/_getUserPlaylists": 
+    "allow anyone to get a user's playlists",
 };
 
 /**
@@ -66,6 +72,4 @@ export const exclusions: Array<string> = [
   "/api/Playlist/deletePlaylist",
   "/api/Playlist/addItem",
   "/api/Playlist/deleteItem",
-  "/api/Playlist/_getPlaylistItems",
-  "api/Playlist/_getUserPlaylists",
 ];
