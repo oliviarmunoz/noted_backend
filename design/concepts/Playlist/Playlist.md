@@ -30,8 +30,13 @@
 - `createPlaylist(user: User, playlistName: String)`
   - _Requires_: `playlistName` to not already exist in set of playlists associated with the `user`.
   - _Effects_: Creates a new Playlist with the given information.
+- `deletePlaylist (user: User, playlistName: String)`
+  - _Requires_: A playlist with the given `playlistName` must exist for the `user`.
+  - _Effects_: Deletes the specified playlist.
 - `_getPlaylistItems(user: User, playlistName: String): Item[]`
   - _Requires_: `playlistName` is in set of playlists associated with the `user`.
   - _Effects_: Returns all items in this playlist.
+- `_getUserPlaylists (user: User): (playlistName: String, isPublic: Flag, playlistId: Playlist, items: Item[])[]`
+  - Effects: Returns all playlists that the given `user` owns.
 
 _Note_: This concept will be used to implement the “Listen Later” and “Favorites” playlist. The user should only be able to add and remove items, while the backend will create those playlists upon user creation.

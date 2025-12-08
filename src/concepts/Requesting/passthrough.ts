@@ -56,7 +56,14 @@ export const inclusions: Record<string, string> = {
   // Friending
   "/api/Friending/_getFriends": "friends are a public query",
   "/api/Friending/_getIncomingRequests": "friend requests are a public query",
-  "/api/Friending/_getOutgoingRequests": "friend requests are a public query",};
+  "/api/Friending/_getOutgoingRequests": "friend requests are a public query",
+
+  // Playlist
+  "/api/Playlist/_getPlaylistItems":
+    "allow anyone to get all items from a playlist",
+  "api/Playlist/_getUserPlaylists": 
+    "allow anyone to get a user's playlists",
+};
 
 /**
  * EXCLUSIONS
@@ -77,6 +84,8 @@ export const exclusions: Array<string> = [
 
   "/api/Playlist/createPlaylist",
   "/api/Playlist/deletePlaylist",
+  "/api/Playlist/addItem",
+  "/api/Playlist/deleteItem",
 
   "/api/Profile/updateBio",
   "/api/Profile/updateThumbnail",
