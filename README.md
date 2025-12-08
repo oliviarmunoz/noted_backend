@@ -11,6 +11,7 @@ Noted is a social app for sharing and discovering music. Rate what you’ve been
 - [Week 2](/project-updates/week2.md)
 - [Week 3](/project-updates/week3.md)
 - [Week 4](/project-updates/week4.md)
+- [Week 5](/project-updates/week5.md)
 
 ## Assignments
 
