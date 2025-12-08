@@ -69,10 +69,22 @@ export default class ReviewConcept {
    * @requires A user can only post one review per item.
    * @effects Creates and returns a review with the given information.
    */
-  async postReview(
-    { item, user, ratingNumber, notes }: { item: Item; user: User; ratingNumber: number; notes?: string },
-  ): Promise<{ review: Review } | { error: string }> {
-    if (ratingNumber < 0 || ratingNumber > 5 || !Number.isInteger(ratingNumber)) {
+  async postReview({
+    item,
+    user,
+    ratingNumber,
+    notes,
+  }: {
+    item: Item;
+    user: User;
+    ratingNumber: number;
+    notes?: string;
+  }): Promise<{ review: Review } | { error: string }> {
+    if (
+      ratingNumber < 0 ||
+      ratingNumber > 5 ||
+      !Number.isInteger(ratingNumber)
+    ) {
       return { error: "Rating must be an integer between 0 and 5." };
     }
 
@@ -102,16 +114,26 @@ export default class ReviewConcept {
    * @requires review exists, ratingNumber is an integer in the range [0,5].
    * @effects Updates the ratingNumber and notes of the associated review.
    */
-  async updateReview(
-    { review, ratingNumber, notes }: { review: Review; ratingNumber: number; notes?: string },
-  ): Promise<Empty | { error: string }> {
-    if (ratingNumber < 0 || ratingNumber > 5 || !Number.isInteger(ratingNumber)) {
+  async updateReview({
+    review,
+    ratingNumber,
+    notes,
+  }: {
+    review: Review;
+    ratingNumber: number;
+    notes?: string;
+  }): Promise<Empty | { error: string }> {
+    if (
+      ratingNumber < 0 ||
+      ratingNumber > 5 ||
+      !Number.isInteger(ratingNumber)
+    ) {
       return { error: "Rating must be an integer between 0 and 5." };
     }
 
     const result = await this.reviews.updateOne(
       { _id: review },
-      { $set: { rating: ratingNumber, notes, date: new Date() } }, // Also update the date on modification
+      { $set: { rating: ratingNumber, notes, date: new Date() } } // Also update the date on modification
     );
 
     if (result.matchedCount === 0) {
@@ -126,7 +148,11 @@ export default class ReviewConcept {
    * @requires review exists.
    * @effects Removes the associated review from the set of all reviews.
    */
-  async deleteReview({ review }: { review: Review }): Promise<Empty | { error: string }> {
+  async deleteReview({
+    review,
+  }: {
+    review: Review;
+  }): Promise<Empty | { error: string }> {
     const result = await this.reviews.deleteOne({ _id: review });
 
     if (result.deletedCount === 0) {
@@ -141,15 +167,26 @@ export default class ReviewConcept {
    * @requires review exists.
    * @effects Adds a comment by the input user to the list of comments of the associated review.
    */
-  async addComment(
-    { review, commenter, comment }: { review: Review; commenter: User; comment: string },
-  ): Promise<{ commentId: ID } | { error: string }> {
+  async addComment({
+    review,
+    commenter,
+    comment,
+  }: {
+    review: Review;
+    commenter: User;
+    comment: string;
+  }): Promise<{ commentId: ID } | { error: string }> {
     const commentId = freshID();
-    const newComment: Comment = { commentId, commenter, notes: comment, date: new Date() };
+    const newComment: Comment = {
+      commentId,
+      commenter,
+      notes: comment,
+      date: new Date(),
+    };
 
     const result = await this.reviews.updateOne(
       { _id: review },
-      { $push: { comments: newComment } },
+      { $push: { comments: newComment } }
     );
 
     if (result.matchedCount === 0) {
@@ -164,12 +201,16 @@ export default class ReviewConcept {
    * @requires review to be in the set of reviews, commentId to be in list of comments of the associated review.
    * @effects Deletes the comment from the list.
    */
-  async deleteComment(
-    { review, commentId }: { review: Review; commentId: ID },
-  ): Promise<Empty | { error: string }> {
+  async deleteComment({
+    review,
+    commentId,
+  }: {
+    review: Review;
+    commentId: ID;
+  }): Promise<Empty | { error: string }> {
     const result = await this.reviews.updateOne(
       { _id: review },
-      { $pull: { comments: { commentId } } },
+      { $pull: { comments: { commentId } } }
     );
 
     if (result.matchedCount === 0) {
@@ -178,7 +219,9 @@ export default class ReviewConcept {
       if (reviewExists === 0) {
         return { error: `Review with ID ${review} not found.` };
       } else {
-        return { error: `Comment with ID ${commentId} not found in review ${review}.` };
+        return {
+          error: `Comment with ID ${commentId} not found in review ${review}.`,
+        };
       }
     }
     return {};
@@ -189,9 +232,26 @@ export default class ReviewConcept {
    *
    * @effects Returns the review that the given user has authored for an item, or null if not found.
    */
-  async _getReviewByItemAndUser(
-    { item, user }: { item: Item; user: User },
-  ): Promise<ReviewDoc | null> {
+  async _getReviewAuthor({ review }: { review: Review }): Promise<ID[]> {
+    const reviewDoc = await this.reviews.findOne(
+      { _id: review },
+      { projection: { user: 1 } }
+    );
+    return [reviewDoc?.user as ID];
+  }
+
+  /**
+   * Query: _getReviewByItemAndUser (item: Item, user: User): (review: ReviewDoc)
+   *
+   * @effects Returns the review that the given user has authored for an item, or null if not found.
+   */
+  async _getReviewByItemAndUser({
+    item,
+    user,
+  }: {
+    item: Item;
+    user: User;
+  }): Promise<ReviewDoc | null> {
     return await this.reviews.findOne({ item, user });
   }
 
@@ -219,7 +279,10 @@ export default class ReviewConcept {
    * @effects Returns all comments associated with the given review.
    */
   async _getReviewComments({ review }: { review: Review }): Promise<Comment[]> {
-    const reviewDoc = await this.reviews.findOne({ _id: review }, { projection: { comments: 1 } });
+    const reviewDoc = await this.reviews.findOne(
+      { _id: review },
+      { projection: { comments: 1 } }
+    );
     return reviewDoc?.comments || [];
   }
 }

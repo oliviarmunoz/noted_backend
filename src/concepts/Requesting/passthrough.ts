@@ -27,6 +27,7 @@
 export const inclusions: Record<string, string> = {
   // Review
   "/api/Review/_getReviewByItemAndUser": "reviews are public",
+  "/api/Review/_getReviewAuthor": "reviews are public",
   "/api/Review/_getItemReviews": "reviews are public",
   "/api/Review/_getUserReviews": "reviews are public unless marked otherwise",
   "/api/Review/_getReviewComments": "comments are public",
@@ -96,5 +97,11 @@ export const exclusions: Array<string> = [
   "/api/Friending/sendFriendRequest",
   "/api/Friending/acceptFriendRequest",
   "/api/Friending/removeFriendRequest",
-  "/api/Friending/removeFriend"
+  "/api/Friending/removeFriend",
+
+  "/api/Review/postReview",
+  "/api/Review/updateReview",
+  "/api/Review/deleteReview",
+  "/api/Review/addComment",
+  "/api/Review/deleteComment",
 ];
