@@ -10,6 +10,7 @@ import * as sync_sample from "./sample.sync.ts";
 import * as sync_Profile from "./Profile.sync.ts";
 import * as sync_Review from "./Review.sync.ts";
 import * as sync_Friending from "./Friending.sync.ts";
+import * as sync_MusicDiscovery from "./MusicDiscovery.sync.ts";
 
 const allSyncs: Record<string, Sync> = {};
 
@@ -42,6 +43,11 @@ for (const [name, func] of Object.entries(sync_Review)) {
 for (const [name, func] of Object.entries(sync_Friending)) {
   if (typeof func === "function") {
     allSyncs[`Friending.${name}`] = func as Sync;
+  }
+}
+for (const [name, func] of Object.entries(sync_MusicDiscovery)) {
+  if (typeof func === "function") {
+    allSyncs[`MusicDiscovery.${name}`] = func as Sync;
   }
 }
 

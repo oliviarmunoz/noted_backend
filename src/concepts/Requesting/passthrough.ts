@@ -33,10 +33,10 @@ export const inclusions: Record<string, string> = {
   "/api/Review/_getReviewComments": "comments are public",
 
   // MusicDiscovery
-  "/api/MusicDiscovery/search": "searching is public",
-  "/api/MusicDiscovery/loadEntityDetails": "searching is public",
   "/api/MusicDiscovery/_getSearchResults": "searching is public",
   "/api/MusicDiscovery/_getEntityFromUri": "searching is public",
+  "/api/MusicDiscovery/_getEntityFromId": "searching is public",
+  "/api/MusicDiscovery/_getEntity": "searching is public",
 
   // UserAuthentication
   "/api/UserAuthentication/_getUserByUsername":
@@ -62,8 +62,7 @@ export const inclusions: Record<string, string> = {
   // Playlist
   "/api/Playlist/_getPlaylistItems":
     "allow anyone to get all items from a playlist",
-  "api/Playlist/_getUserPlaylists": 
-    "allow anyone to get a user's playlists",
+  "/api/Playlist/_getUserPlaylists": "allow anyone to get a user's playlists",
 };
 
 /**
@@ -104,4 +103,9 @@ export const exclusions: Array<string> = [
   "/api/Review/deleteReview",
   "/api/Review/addComment",
   "/api/Review/deleteComment",
+
+  "/api/MusicDiscovery/upsertSpotifyItem",
+  "/api/MusicDiscovery/clearSearch",
+  "/api/MusicDiscovery/search",
+  "/api/MusicDiscovery/loadEntityDetails",
 ];
