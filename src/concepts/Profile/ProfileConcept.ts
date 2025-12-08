@@ -14,7 +14,7 @@ type User = ID;
  */
 interface UserProfileDoc {
   _id: User;
-  bio?: string; 
+  bio?: string;
   thumbnailUrl?: string;
 }
 
@@ -31,8 +31,6 @@ export default class ProfileConcept {
   constructor(private readonly db: Db) {
     this.userProfiles = this.db.collection(PREFIX + "userProfiles");
   }
-
-  // Removed addBio action, as updateBio handles creation and modification
 
   /**
    * Action: Updates a user's biographical information.
@@ -57,7 +55,7 @@ export default class ProfileConcept {
       await this.userProfiles.updateOne(
         { _id: user },
         { $set: { bio } },
-        { upsert: true } 
+        { upsert: true }
       );
       return {};
     } catch (e) {
@@ -65,8 +63,6 @@ export default class ProfileConcept {
       return { error: "Failed to update user bio." };
     }
   }
-
-  // Removed addThumbnail action, as updateThumbnail handles creation and modification
 
   /**
    * Action: Updates a user's profile thumbnail URL.
@@ -91,12 +87,38 @@ export default class ProfileConcept {
       await this.userProfiles.updateOne(
         { _id: user },
         { $set: { thumbnailUrl } },
-        { upsert: true } 
+        { upsert: true }
       );
       return {};
     } catch (e) {
       console.error(`Error updating thumbnail for user ${user}:`, e);
       return { error: "Failed to update user thumbnail." };
+    }
+  }
+
+  /**
+   * Action: Deletes a user's profile.
+   *
+   * @param user The ID of the user whose profile is to be deleted.
+   * @returns An empty object on success, or an error object if the profile does not exist or deletion fails.
+   *
+   *
+   * @effects Deletes the profile associated with the `user`.
+   */
+  async deleteProfile({
+    user,
+  }: {
+    user: User;
+  }): Promise<Empty | { error: string }> {
+    try {
+      const result = await this.userProfiles.deleteOne({ _id: user });
+      if (result.deletedCount === 0) {
+        return { error: `Profile for user ${user} not found.` };
+      }
+      return {};
+    } catch (e) {
+      console.error(`Error deleting profile for user ${user}:`, e);
+      return { error: "Failed to delete user profile." };
     }
   }
 

@@ -44,8 +44,19 @@ export const inclusions: Record<string, string> = {
     "allow anyone to get a username by user id (public query)",
 
   // Session
-  "/api/Session/_getUser": "allow anyone to get a user by session id (public query)"
-};
+  "/api/Session/_getUser":
+    "allow anyone to get a user by session id (public query)",
+
+  // Profile
+  "/api/Profile/_getBio": "bios are publicly displayed on the profile",
+  "/api/Profile/_getThumbnail":
+    "thumbnails are publicly displayed on the profile",
+  "/api/Profile/_getProfile": "profiles are public",
+
+  // Friending
+  "/api/Friending/_getFriends": "friends are a public query",
+  "/api/Friending/_getIncomingRequests": "friend requests are a public query",
+  "/api/Friending/_getOutgoingRequests": "friend requests are a public query",};
 
 /**
  * EXCLUSIONS
@@ -60,8 +71,20 @@ export const inclusions: Record<string, string> = {
 export const exclusions: Array<string> = [
   "/api/Session/create",
   "/api/Session/delete",
+
   "/api/UserAuthentication/register",
   "/api/UserAuthentication/authenticate",
+
   "/api/Playlist/createPlaylist",
-  "/api/Playlist/deletePlaylist"
+  "/api/Playlist/deletePlaylist",
+
+  "/api/Profile/updateBio",
+  "/api/Profile/updateThumbnail",
+  "/api/Profile/deleteProfile",
+
+  "/api/Friending/ensureUserExists",
+  "/api/Friending/sendFriendRequest",
+  "/api/Friending/acceptFriendRequest",
+  "/api/Friending/removeFriendRequest",
+  "/api/Friending/removeFriend"
 ];
