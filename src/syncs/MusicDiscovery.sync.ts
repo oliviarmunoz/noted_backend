@@ -18,7 +18,7 @@ export const MusicSearchRequest: Sync = ({
 }) => ({
   when: actions([
     Requesting.request,
-    { path: "/music/search", session, query },
+    { path: "/MusicDiscovery/search", session, query },
     { request },
   ]),
   where: async (frames) => {
@@ -42,7 +42,7 @@ export const MusicSearchResponseSuccess: Sync = ({
   musicEntities,
 }) => ({
   when: actions(
-    [Requesting.request, { path: "/music/search" }, { request }],
+    [Requesting.request, { path: "/MusicDiscovery/search" }, { request }],
     [MusicDiscovery.search, {}, { musicEntities }] // Matches the successful output of MusicDiscovery.search
   ),
   then: actions([Requesting.respond, { request, musicEntities }]),
@@ -58,7 +58,7 @@ export const MusicSearchResponseSuccess: Sync = ({
  */
 export const MusicSearchResponseError: Sync = ({ request, error }) => ({
   when: actions(
-    [Requesting.request, { path: "/music/search" }, { request }],
+    [Requesting.request, { path: "/MusicDiscovery/search" }, { request }],
     [MusicDiscovery.search, {}, { error }] // Matches the error output of MusicDiscovery.search
   ),
   then: actions([Requesting.respond, { request, error }]),
@@ -86,80 +86,31 @@ export const LoadMusicEntityDetailsRequest: Sync = ({
   then: actions([MusicDiscovery.loadEntityDetails, { externalId, type }]),
 });
 
-export const LoadMusicEntityDetailsResponseSuccess: Sync = ({
-  request,
-  music,
-}) => ({
+export const LoadMusicEntityDetailsResponseSuccess: Sync = ({ request, music }) => ({
   when: actions(
-    [Requesting.request, { path: "/music/entity/details" }, { request }],
+    [Requesting.request, { path: "/MusicDiscovery/loadEntityDetails" }, { request }],
     [MusicDiscovery.loadEntityDetails, {}, { music }] // Matches the successful output of MusicDiscovery.loadEntityDetails
   ),
   then: actions([Requesting.respond, { request, music }]),
 });
 
-export const LoadMusicEntityDetailsResponseError: Sync = ({
-  request,
-  error,
-}) => ({
+export const LoadMusicEntityDetailsResponseError: Sync = ({ request, error }) => ({
   when: actions(
-    [Requesting.request, { path: "/music/entity/details" }, { request }],
+    [
+      Requesting.request,
+      { path: "/MusicDiscovery/loadEntityDetails" },
+      { request },
+    ],
     [MusicDiscovery.loadEntityDetails, {}, { error }] // Matches the error output of MusicDiscovery.loadEntityDetails
   ),
   then: actions([Requesting.respond, { request, error }]),
-});
-
-// --- Syncs for MusicDiscovery._getSearchResults (Authenticated Query for User's Search History) ---
-
-export const GetMySearchResultsRequest: Sync = ({
-  request,
-  session,
-  user,
-  musicEntity,
-  results,
-}) => ({
-  when: actions([
-    Requesting.request,
-    { path: "/music/my-search-results", session },
-    { request },
-  ]),
-  where: async (frames) => {
-    const originalFrame = frames[0]; // Capture original request frame for consistent response structure
-
-    // Authenticate the user session
-    frames = await frames.query(Session._getUser, { session }, { user });
-
-    if (frames.length === 0) {
-      // If session is invalid, respond immediately with an empty array for results
-      return new Frames({ ...originalFrame, [results]: [] });
-    }
-
-    // Query for music entities linked to the user's search results
-    // Assuming MusicDiscovery._getSearchResults returns Array<{ musicEntity: MusicEntity }>
-    frames = await frames.query(
-      MusicDiscovery._getSearchResults,
-      { user },
-      { musicEntity }
-    );
-
-    if (frames.length === 0) {
-      // If no search results are found, respond with an empty array for results
-      return new Frames({ ...originalFrame, [results]: [] });
-    }
-
-    // Collect all 'musicEntity' bindings from the resulting frames into a single 'results' array
-    return new Frames({
-      ...originalFrame,
-      [results]: frames.map(($) => $[musicEntity]),
-    });
-  },
-  then: actions([Requesting.respond, { request, results }]),
 });
 
 // --- Syncs for MusicDiscovery.clearSearch (Authenticated Clear Search History) ---
 export const ClearMySearchRequest: Sync = ({ request, session, user }) => ({
   when: actions([
     Requesting.request,
-    { path: "/music/clear-search", session },
+    { path: "/MusicDiscovery/clearSearch", session },
     { request },
   ]),
   where: async (frames) => {
@@ -172,7 +123,7 @@ export const ClearMySearchRequest: Sync = ({ request, session, user }) => ({
 
 export const ClearMySearchResponseSuccess: Sync = ({ request }) => ({
   when: actions(
-    [Requesting.request, { path: "/music/clear-search" }, { request }],
+    [Requesting.request, { path: "/MusicDiscovery/clearSearch" }, { request }],
     [MusicDiscovery.clearSearch, {}, {}] // Matches the empty output of MusicDiscovery.clearSearch
   ),
   then: actions([
@@ -183,7 +134,7 @@ export const ClearMySearchResponseSuccess: Sync = ({ request }) => ({
 
 export const ClearMySearchResponseError: Sync = ({ request, error }) => ({
   when: actions(
-    [Requesting.request, { path: "/music/clear-search" }, { request }],
+    [Requesting.request, { path: "/MusicDiscovery/clearSearch" }, { request }],
     [MusicDiscovery.clearSearch, {}, { error }] // Matches the error output of MusicDiscovery.clearSearch
   ),
   then: actions([Requesting.respond, { request, error }]),
