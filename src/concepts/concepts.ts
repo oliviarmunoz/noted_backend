@@ -8,6 +8,7 @@ export const Engine = new SyncConcept();
 import { getDb } from "@utils/database.ts";
 
 import PlaylistConcept from "./Playlist/PlaylistConcept.ts";
+import UpvoteConcept from "./Upvote/UpvoteConcept.ts";
 import MusicDiscoveryConcept from "./MusicDiscovery/MusicDiscoveryConcept.ts";
 import FriendingConcept from "./Friending/FriendingConcept.ts";
 import ProfileConcept from "./Profile/ProfileConcept.ts";
@@ -17,6 +18,7 @@ import UserAuthenticationConcept from "./UserAuthentication/UserAuthenticationCo
 import SessionConcept from "./Session/SessionConcept.ts";
 
 export type { default as PlaylistConcept } from "./Playlist/PlaylistConcept.ts";
+export type { default as UpvoteConcept } from "./Upvote/UpvoteConcept.ts";
 export type { default as MusicDiscoveryConcept } from "./MusicDiscovery/MusicDiscoveryConcept.ts";
 export type { default as FriendingConcept } from "./Friending/FriendingConcept.ts";
 export type { default as ProfileConcept } from "./Profile/ProfileConcept.ts";
@@ -29,6 +31,7 @@ export type { default as SessionConcept } from "./Session/SessionConcept.ts";
 export const [db, client] = await getDb();
 
 export const Playlist = Engine.instrumentConcept(new PlaylistConcept(db));
+export const Upvote = Engine.instrumentConcept(new UpvoteConcept(db));
 export const MusicDiscovery = Engine.instrumentConcept(new MusicDiscoveryConcept(db));
 export const Friending = Engine.instrumentConcept(new FriendingConcept(db));
 export const Profile = Engine.instrumentConcept(new ProfileConcept(db));

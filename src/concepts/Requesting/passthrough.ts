@@ -63,6 +63,13 @@ export const inclusions: Record<string, string> = {
   "/api/Playlist/_getPlaylistItems":
     "allow anyone to get all items from a playlist",
   "/api/Playlist/_getUserPlaylists": "allow anyone to get a user's playlists",
+
+  // Upvote
+  "/api/Upvote/_hasUpvoted": "public query",
+  "/api/Upvote/_getUpvoteCount": "public query",
+  "/api/Upvote/_getUpvotedItems": "public query",
+  "/api/Upvote/_getUpvoters": "public query"
+
 };
 
 /**
@@ -108,4 +115,7 @@ export const exclusions: Array<string> = [
   "/api/MusicDiscovery/clearSearch",
   "/api/MusicDiscovery/search",
   "/api/MusicDiscovery/loadEntityDetails",
+
+  "/api/Upvote/upvote",
+  "/api/Upvote/unvote",
 ];

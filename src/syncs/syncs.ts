@@ -8,6 +8,7 @@ import * as sync_UserAuthentication from "./UserAuthentication.sync.ts";
 import * as sync_Playlist from "./Playlist.sync.ts";
 import * as sync_sample from "./sample.sync.ts";
 import * as sync_Profile from "./Profile.sync.ts";
+import * as sync_Upvote from "./Upvote.sync.ts";
 import * as sync_Review from "./Review.sync.ts";
 import * as sync_Friending from "./Friending.sync.ts";
 import * as sync_MusicDiscovery from "./MusicDiscovery.sync.ts";
@@ -33,6 +34,11 @@ for (const [name, func] of Object.entries(sync_sample)) {
 for (const [name, func] of Object.entries(sync_Profile)) {
   if (typeof func === "function") {
     allSyncs[`Profile.${name}`] = func as Sync;
+  }
+}
+for (const [name, func] of Object.entries(sync_Upvote)) {
+  if (typeof func === "function") {
+    allSyncs[`Upvote.${name}`] = func as Sync;
   }
 }
 for (const [name, func] of Object.entries(sync_Review)) {
