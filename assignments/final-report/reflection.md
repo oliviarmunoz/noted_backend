@@ -1,0 +1,5 @@
+# Reflections
+
+## Olivia
+
+I felt much more confident in this project compared to my individual project. I was able to get started much faster and make progress without getting stuck. From the individual project, I learned how to implement the concepts, organize the app into different pages/components, and implement syncs. This time around, I was familiar with the structure of all the files and common sources of bugs. I feel like I relied on Cursor/Context less this time than before since I had a lot of small errors in my original project, so I wanted to avoid doing that again this time. I paid close attention to small, less obvious bugs, such as incorrect parameter names or paths, since these tools are likely to accidentally overlook them. Overall, I am very satisfied with our process, and I feel like every member was able to significantly contribute to the final project. The workflow felt very similar to my experiences in industry, with each of us working independently and contributing to a shared repo. We had differences in opinion about some design choices, but we were able to put everything together in the end. Great experience overall!
