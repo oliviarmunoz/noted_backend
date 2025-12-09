@@ -26,4 +26,4 @@ Noted is a social app for sharing and discovering music. Rate what you’ve been
 - [User Testing Reports](assignments/user-testing/study-reports.md)
 - [Final Design Summary](assignments/final-report/design-summary.md)
 - [Reflections](assignments/final-report/reflection.md)
-- [Final Demo](https://youtu.be/hw4FMROphBo)
+- [Final Demo](https://youtu.be/kQTcvuM7Ss4)
